@@ -26,7 +26,12 @@ function authFetch(url: string, opts: RequestInit = {}) {
   return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, ...opts.headers } });
 }
 
-function Avatar({ user, size = 40 }: { user: Pick<UserInfo, "display_name" | "username" | "profile_picture">; size?: number }) {
+function Avatar({ user, size = 40 }: { user: Pick<UserInfo, "display_name" | "username" | "profile_picture"> | null; size?: number }) {
+  if (!user) {
+    return (
+      <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36 }} />
+    );
+  }
   const hasPic = !!user.profile_picture;
   const src = hasPic ? (user.profile_picture?.startsWith("http") ? user.profile_picture : `${API}${user.profile_picture}`) : "";
   return (
@@ -127,7 +132,7 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
 }
 
 /* ── Comments Panel ───────────────────────────────────────── */
-function CommentsPanel({ post, currentUser }: { post: Post; currentUser: UserInfo }) {
+function CommentsPanel({ post, currentUser }: { post: Post; currentUser: UserInfo | null }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [text, setText] = useState("");
@@ -179,7 +184,7 @@ function CommentsPanel({ post, currentUser }: { post: Post; currentUser: UserInf
         : comments.length === 0 ? <p className={styles.noComments}>No comments yet. Be first!</p>
           : <div className={styles.commentList}>{comments.map(c => (
             <CommentItem key={c.comment_id} comment={c} postId={post.post_id}
-              currentUserId={String(currentUser.user_id)}
+              currentUserId={currentUser ? String(currentUser.user_id) : ""}
               onDelete={handleDelete} onUpdate={handleUpdate} />
           ))}</div>}
     </div>
@@ -187,7 +192,7 @@ function CommentsPanel({ post, currentUser }: { post: Post; currentUser: UserInf
 }
 
 // Full PostCard matching feed/page.tsx
-function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUser: UserInfo; onDelete: (id: string) => void }) {
+function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUser: UserInfo | null; onDelete: (id: string) => void }) {
   const router = useRouter();
   const [post, setPost] = useState(init);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -208,7 +213,7 @@ function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUs
     onDelete(post.post_id);
   };
 
-  const isOwn = String(post.user_id) === String(currentUser.user_id);
+  const isOwn = currentUser && String(post.user_id) === String(currentUser.user_id);
   const name = post.display_name || post.username;
 
   return (
@@ -372,9 +377,11 @@ export default function ProfilePage() {
           <div className={styles.sideItem}>
             <Bell size={20} /><span>Notifications</span>
           </div>
-          <div className={`${styles.sideItem} ${user.username === targetUsername ? styles.sideActive : ""}`} onClick={() => router.push(`/${user.username}`)}>
-            <User size={20} /><span>Profile</span>
-          </div>
+          {user && (
+            <div className={`${styles.sideItem} ${user.username === targetUsername ? styles.sideActive : ""}`} onClick={() => router.push(`/${user.username}`)}>
+              <User size={20} /><span>Profile</span>
+            </div>
+          )}
         </nav>
 
         <div className={styles.sideFooter}>
@@ -382,14 +389,16 @@ export default function ProfilePage() {
             {dark ? <Moon size={16} /> : <Sun size={16} />}
             <Toggle checked={dark} onCheckedChange={toggleDark} />
           </div>
-          <div className={styles.sideUser}>
-            <Avatar user={user} size={36} />
-            <div className={styles.sideUserText}>
-              <span className={styles.sideUserName}>{user.display_name || user.username}</span>
-              <span className={styles.sideUserHandle}>@{user.username}</span>
+          {user && (
+            <div className={styles.sideUser}>
+              <Avatar user={user} size={36} />
+              <div className={styles.sideUserText}>
+                <span className={styles.sideUserName}>{user.display_name || user.username}</span>
+                <span className={styles.sideUserHandle}>@{user.username}</span>
+              </div>
+              <button className={styles.logoutBtn} onClick={handleLogout}><LogOut size={16} /></button>
             </div>
-            <button className={styles.logoutBtn} onClick={handleLogout}><LogOut size={16} /></button>
-          </div>
+          )}
         </div>
       </aside>
 
