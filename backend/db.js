@@ -1,12 +1,19 @@
 const { Pool } = require("pg");
 
-const pool = new Pool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-    database: process.env.POSTGRES_DB
-});
+const poolConfig = process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false } // Required for Neon cloud connection
+      }
+    : {
+        host: process.env.DB_HOST,
+        port: process.env.DB_PORT,
+        user: process.env.POSTGRES_USER,
+        password: process.env.POSTGRES_PASSWORD,
+        database: process.env.POSTGRES_DB
+      };
+
+const pool = new Pool(poolConfig);
 
 // Initialize hashtag_metrics table and sync it with existing posts
 (async () => {
