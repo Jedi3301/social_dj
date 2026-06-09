@@ -1,0 +1,165 @@
+/* ── Dashboard ───────────────────────────────────────────────── */
+
+.loadingShell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-canvas);
+}
+
+.shell {
+  min-height: 100vh;
+  background: var(--color-canvas);
+}
+
+/* ── Top nav ─────────────────────────────────────────────────── */
+.topNav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--color-canvas);
+  border-bottom: 1px solid var(--color-hairline);
+  height: 56px;
+  display: flex;
+  align-items: center;
+}
+
+.navInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+  letter-spacing: -0.4px;
+}
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--rounded-full);
+  background: var(--color-ink);
+  color: var(--color-on-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+}
+
+/* ── Main content ───────────────────────────────────────────── */
+.main {
+  padding-block: var(--spacing-xxl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+/* ── Welcome block ──────────────────────────────────────────── */
+.welcomeBlock {
+  padding: var(--spacing-xxl) !important;
+}
+
+.welcomeHeadline {
+  font-family: var(--font-sans);
+  font-size: 48px;
+  font-weight: 340;
+  line-height: 1.10;
+  letter-spacing: -0.80px;
+  color: var(--color-ink);
+}
+
+.nameHighlight {
+  font-style: italic;
+}
+
+/* ── Stats grid ─────────────────────────────────────────────── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-md);
+}
+
+.statCard {
+  /* inherits color-block styles */
+}
+
+.statValue {
+  font-family: var(--font-sans);
+  font-size: 42px;
+  font-weight: 340;
+  line-height: 1.10;
+  letter-spacing: -0.60px;
+  color: var(--color-ink);
+}
+
+/* ── Info card ──────────────────────────────────────────────── */
+.infoCard {
+  /* inherits .card */
+}
+
+.infoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) 0;
+  border-bottom: 1px solid var(--color-hairline-soft);
+}
+.infoRow:last-child { border-bottom: none; }
+
+.infoTerm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.60px;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.infoDef {
+  font-size: 16px;
+  font-weight: 330;
+  color: var(--color-ink);
+}
+
+/* ── CTA block ──────────────────────────────────────────────── */
+.ctaBlock {
+  /* inherits color-block color-block-navy */
+}
+
+.ctaActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .statsGrid { grid-template-columns: 1fr; }
+  .welcomeHeadline { font-size: 36px; }
+}
+
+@media (max-width: 560px) {
+  .ctaActions { flex-direction: column; }
+  .ctaActions .btn { width: 100%; }
+}

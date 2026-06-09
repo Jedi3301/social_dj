@@ -1,0 +1,365 @@
+/* ── Register page layout ──────────────────────────────────── */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Left panel ─────────────────────────────────────────────── */
+.leftPanel {
+  flex: 1;
+  background: var(--color-canvas);
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-xxl);
+  border-right: 1px solid var(--color-hairline);
+}
+
+.leftInner {
+  width: 100%;
+  max-width: 480px;
+}
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-ink);
+  letter-spacing: -0.5px;
+  margin-bottom: var(--spacing-xl);
+}
+
+/* ── Lime feature block ─────────────────────────────────────── */
+.featureBlock {
+  margin-bottom: var(--spacing-lg);
+}
+
+.featureList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 18px;
+  font-weight: 320;
+  line-height: 1.45;
+  color: var(--color-ink);
+}
+
+.checkIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--rounded-full);
+  background: var(--color-ink);
+  color: var(--color-on-primary);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Coral stats block ──────────────────────────────────────── */
+.accentBlock { /* inherits color-block styles */ }
+
+.statsRow {
+  display: flex;
+  gap: var(--spacing-xl);
+  margin-top: var(--spacing-sm);
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statNum {
+  font-size: 26px;
+  font-weight: 540;
+  line-height: 1.20;
+  letter-spacing: -0.40px;
+  color: var(--color-ink);
+}
+
+.statLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.60px;
+  text-transform: uppercase;
+  color: var(--color-ink);
+  opacity: 0.60;
+}
+
+/* ── Right form panel ───────────────────────────────────────── */
+.rightPanel {
+  flex: 0 0 540px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl) var(--spacing-xl);
+  background: var(--color-canvas);
+  overflow-y: auto;
+}
+
+.formWrap {
+  width: 100%;
+  max-width: 440px;
+  padding-block: var(--spacing-xl);
+}
+
+.formHeader {
+  margin-bottom: var(--spacing-xl);
+}
+
+.alertBox {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xxs);
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 480;
+  letter-spacing: -0.10px;
+  color: var(--color-ink);
+}
+
+/* ── Input wrapper (for icon overlay) ─────────────────────── */
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.inputWithIcon {
+  padding-right: 40px !important;
+}
+
+.inputValid {
+  border-color: #27ae60 !important;
+}
+
+.inputIcon {
+  position: absolute;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  font-size: 15px;
+}
+
+/* Email status icons */
+.emailSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #aaa;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.emailValid {
+  color: #27ae60;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.emailInvalid {
+  color: #c0392b;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* ── Eye toggle button ──────────────────────────────────────── */
+.eyeBtn {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  opacity: 0.55;
+  transition: opacity 0.15s;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+}
+.eyeBtn:hover { opacity: 1; }
+
+/* ── Field hints / messages ─────────────────────────────────── */
+.fieldError {
+  font-size: 12px;
+  font-weight: 400;
+  color: #c0392b;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.fieldSuccess {
+  font-size: 12px;
+  font-weight: 480;
+  color: #27ae60;
+  margin-top: 2px;
+}
+
+.fieldHint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-ink);
+  opacity: 0.55;
+  margin-top: 2px;
+}
+
+/* ── Password strength bar ──────────────────────────────────── */
+.strengthWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: 6px;
+}
+
+.strengthBar {
+  display: flex;
+  gap: 3px;
+  flex: 1;
+}
+
+.strengthSegment {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  transition: background 0.3s ease;
+}
+
+.strengthLabel {
+  font-size: 11px;
+  font-weight: 480;
+  min-width: 58px;
+  transition: color 0.3s;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ── Password requirements checklist ───────────────────────── */
+.rulesList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-surface-soft);
+  border-radius: var(--rounded-md);
+  border: 1px solid var(--color-hairline);
+}
+
+.ruleItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.rulePassed {
+  color: #27ae60;
+}
+
+.ruleFailed {
+  color: var(--color-ink);
+  opacity: 0.45;
+}
+
+.ruleIcon {
+  font-size: 11px;
+  font-weight: 700;
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* ── Submit ─────────────────────────────────────────────────── */
+.submitBtn {
+  margin-top: var(--spacing-xs);
+  gap: var(--spacing-sm);
+}
+
+/* ── Footer text ────────────────────────────────────────────── */
+.terms {
+  font-size: 13px;
+  font-weight: 320;
+  color: var(--color-ink);
+  opacity: 0.55;
+  text-align: center;
+  line-height: 1.55;
+  margin-bottom: var(--spacing-lg);
+}
+
+.termsLink {
+  color: var(--color-ink);
+  font-weight: 480;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.termsLink:hover { opacity: 0.65; }
+
+.switchRow {
+  font-size: 16px;
+  font-weight: 330;
+  color: var(--color-ink);
+  opacity: 0.65;
+  text-align: center;
+}
+
+.switchLink {
+  color: var(--color-ink);
+  font-weight: 480;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.switchLink:hover { opacity: 0.65; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .leftPanel { display: none; }
+  .rightPanel {
+    flex: 1;
+    padding: var(--spacing-xl) var(--spacing-lg);
+  }
+}
+
+@media (max-width: 560px) {
+  .rightPanel { padding: var(--spacing-lg) var(--spacing-md); align-items: flex-start; padding-top: 48px; }
+  .formWrap { max-width: 100%; }
+}
