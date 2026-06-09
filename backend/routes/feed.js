@@ -193,7 +193,7 @@ router.get("/posts/:postId/comments", authMiddleware, async (req, res) => {
         const { rows } = await pool.query(
             `SELECT
                 c.comment_id, c.content, c.parent_comment_id, c.created_at,
-                u.user_id, u.username, pr.display_name,
+                u.user_id, u.username, pr.display_name, pr.profile_picture,
                 COUNT(DISTINCT cl.like_id)::int AS like_count,
                 EXISTS(SELECT 1 FROM comment_likes WHERE comment_id=c.comment_id AND user_id=$2) AS liked_by_me
              FROM comments c
@@ -201,7 +201,7 @@ router.get("/posts/:postId/comments", authMiddleware, async (req, res) => {
              LEFT JOIN profiles pr ON u.user_id = pr.user_id
              LEFT JOIN comment_likes cl ON c.comment_id = cl.comment_id
              WHERE c.post_id = $1
-             GROUP BY c.comment_id, u.user_id, u.username, pr.display_name
+             GROUP BY c.comment_id, u.user_id, u.username, pr.display_name, pr.profile_picture
              ORDER BY c.created_at ASC`,
             [postId, userId]
         );
@@ -239,7 +239,7 @@ router.post("/posts/:postId/comments", authMiddleware, async (req, res) => {
             [postId, userId, content.trim(), parent_comment_id || null]
         );
         const { rows: u } = await pool.query(
-            `SELECT u.username, pr.display_name FROM users u LEFT JOIN profiles pr ON u.user_id=pr.user_id WHERE u.user_id=$1`,
+            `SELECT u.username, pr.display_name, pr.profile_picture FROM users u LEFT JOIN profiles pr ON u.user_id=pr.user_id WHERE u.user_id=$1`,
             [userId]
         );
         res.status(201).json({ ...rows[0], ...u[0], like_count: 0, liked_by_me: false, replies: [] });

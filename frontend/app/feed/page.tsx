@@ -14,7 +14,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 /* ── Types ────────────────────────────────────────────────── */
 interface UserInfo { user_id: string; username: string; display_name: string | null; profile_picture: string | null; }
 interface Post extends UserInfo { post_id: string; content: string | null; post_type: string; media_urls: string[]; created_at: string; like_count: number; comment_count: number; liked_by_me: boolean; }
-interface Comment { comment_id: string; user_id: string; username: string; display_name: string | null; content: string; created_at: string; like_count: number; liked_by_me: boolean; parent_comment_id: string | null; replies: Comment[]; }
+interface Comment { comment_id: string; user_id: string; username: string; display_name: string | null; profile_picture?: string | null; content: string; created_at: string; like_count: number; liked_by_me: boolean; parent_comment_id: string | null; replies: Comment[]; }
 
 /* ── Helpers ──────────────────────────────────────────────── */
 function timeAgo(d: string) {
@@ -30,7 +30,7 @@ function authFetch(url: string, opts: RequestInit = {}) {
 }
 
 /* ── Avatar ───────────────────────────────────────────────── */
-function Avatar({ user, size = 40 }: { user: Pick<UserInfo, "display_name" | "username" | "profile_picture"> | null; size?: number }) {
+function Avatar({ user, size = 40 }: { user: { display_name: string | null; username: string; profile_picture?: string | null } | null; size?: number }) {
   if (!user) {
     return (
       <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36 }} />
