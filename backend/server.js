@@ -22,6 +22,10 @@ app.use("/api/feed", feedRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/trends", trendsRoutes);
 
-app.listen(5000, () => {
-    console.log("Server running on port 5000");
-});
+if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    app.listen(5000, () => {
+        console.log("Server running on port 5000");
+    });
+}
+
+module.exports = app;
