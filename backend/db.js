@@ -36,10 +36,10 @@ const pool = new Pool(poolConfig);
         await pool.query(`
             CREATE TABLE IF NOT EXISTS profiles (
                 user_id INT PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
-                first_name VARCHAR(100) NOT NULL,
-                last_name VARCHAR(100) NOT NULL,
+                first_name VARCHAR(100),
+                last_name VARCHAR(100),
                 display_name VARCHAR(200),
-                profile_picture VARCHAR(500),
+                profile_picture TEXT,
                 bio TEXT,
                 profile_color VARCHAR(20)
             )
@@ -116,6 +116,24 @@ const pool = new Pool(poolConfig);
         await pool.query(`
             ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_color VARCHAR(20)
         `);
+
+        // Migrate profile_picture to TEXT if it's still VARCHAR(500)
+        await pool.query(`
+            ALTER TABLE profiles ALTER COLUMN profile_picture TYPE TEXT
+        `);
+
+        // Drop NOT NULL constraints on first/last name for flexibility
+        await pool.query(`
+            ALTER TABLE profiles ALTER COLUMN first_name DROP NOT NULL;
+            ALTER TABLE profiles ALTER COLUMN last_name DROP NOT NULL;
+        `);
+
+        // Create performance indexes to speed up feed loading and lookups
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent_comment_id ON comments(parent_comment_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_follows_following_id ON follows(following_id)`);
 
         // Recalculate metrics from existing posts to ensure it's sync'd
         await pool.query(`

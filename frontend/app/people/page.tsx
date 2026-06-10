@@ -15,12 +15,13 @@ interface UserInfo {
   user_id: string; username: string;
   display_name: string | null; profile_picture: string | null;
   bio: string | null; followers_count?: number;
-  is_following?: boolean;
+  is_following?: boolean; profile_color?: string | null;
 }
 
 interface Me {
   user_id: string; username: string;
   display_name: string | null; profile_picture: string | null;
+  profile_color?: string | null;
 }
 
 function authFetch(url: string, opts: RequestInit = {}) {
@@ -28,13 +29,13 @@ function authFetch(url: string, opts: RequestInit = {}) {
   return fetch(url, { ...opts, headers: { Authorization: `Bearer ${token}`, ...opts.headers } });
 }
 
-function Avatar({ user, size = 40 }: { user: { display_name: string | null; username: string; profile_picture?: string | null } | null; size?: number }) {
+function Avatar({ user, size = 40 }: { user: { display_name: string | null; username: string; profile_picture?: string | null; profile_color?: string | null } | null; size?: number }) {
   if (!user) return <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--color-surface-soft)" }} />;
   const hasPic = !!user.profile_picture;
   const src = hasPic ? (user.profile_picture!.startsWith("http") ? user.profile_picture! : `${API}${user.profile_picture}`) : "";
   const inits = ((user.display_name || user.username) || "").split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
-    <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36 }}>
+    <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36, background: user.profile_color || "var(--color-block-lilac)" }}>
       {hasPic
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={src} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
