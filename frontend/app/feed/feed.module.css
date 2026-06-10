@@ -616,3 +616,301 @@
   padding: 6px 14px !important;
   min-height: 28px !important;
 }
+
+/* ── Modals ────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modalContent {
+  width: 90%;
+  max-width: 440px;
+  max-height: 80vh;
+  background: var(--color-canvas);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-xl);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+  animation: modalPop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.modalTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-ink);
+  opacity: 0.6;
+  padding: 6px;
+  border-radius: var(--rounded-full);
+  display: flex;
+  align-items: center;
+  transition: opacity 0.15s, background 0.15s;
+}
+.modalClose:hover {
+  opacity: 1;
+  background: var(--color-surface-soft);
+}
+
+.modalSearchBox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--rounded-pill);
+  padding: 8px 14px;
+  margin: 14px 20px;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.modalSearchBox:focus-within {
+  border-color: var(--color-ink);
+  background-color: var(--color-canvas);
+}
+
+.modalSearchIcon {
+  color: var(--color-ink);
+  opacity: 0.4;
+  flex-shrink: 0;
+}
+
+.modalSearchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  color: var(--color-ink);
+  width: 100%;
+}
+.modalSearchInput::placeholder {
+  color: var(--color-ink);
+  opacity: 0.4;
+}
+
+.modalBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modalLoader {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+}
+
+.modalEmpty {
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-ink);
+  opacity: 0.5;
+  padding: 24px;
+}
+
+.modalUserRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.modalUserInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.modalUserName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modalUserHandle {
+  font-size: 12px;
+  color: var(--color-ink);
+  opacity: 0.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modalUserFollowBtn {
+  font-size: 12px;
+  padding: 6px 14px !important;
+  min-height: 28px !important;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ── Notifications Page ────────────────────────────────────── */
+.notificationsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.notificationsTitle {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.markReadBtn {
+  background: none;
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--rounded-pill);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.markReadBtn:hover {
+  background: var(--color-surface-soft);
+  border-color: var(--color-ink);
+}
+
+.notificationsList {
+  display: flex;
+  flex-direction: column;
+}
+
+.notificationItem {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+.notificationItem:hover {
+  background: var(--color-surface-soft);
+}
+.notificationUnread {
+  background: rgba(39, 94, 254, 0.03);
+}
+[data-theme="dark"] .notificationUnread {
+  background: rgba(39, 94, 254, 0.05);
+}
+
+.notificationContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notificationText {
+  font-size: 14px;
+  color: var(--color-ink);
+  line-height: 1.45;
+  font-weight: 350;
+}
+.notificationActorName {
+  font-weight: 600;
+}
+
+.notificationSnippet {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink);
+  opacity: 0.6;
+  font-style: italic;
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.notificationMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notificationTime {
+  font-size: 12px;
+  color: var(--color-ink);
+  opacity: 0.4;
+}
+
+.notificationDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #275efe;
+  flex-shrink: 0;
+}
+
+.notificationActionWrap {
+  flex-shrink: 0;
+}
+
+.notificationFollowBtn {
+  font-size: 12px;
+  padding: 6px 14px !important;
+  min-height: 28px !important;
+  font-weight: 600;
+}
+

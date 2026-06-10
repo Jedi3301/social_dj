@@ -59,6 +59,35 @@ router.get("/", authMiddleware, async (req, res) => {
     }
 });
 
+// ─── GET /api/feed/posts/:postId ──────────────────────────────────────────
+router.get("/posts/:postId", authMiddleware, async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const userId = req.user.user_id;
+
+        const { rows } = await pool.query(
+            `SELECT
+                p.post_id, p.content, p.post_type, p.media_urls, p.created_at,
+                u.user_id, u.username,
+                pr.display_name, pr.profile_picture, pr.profile_color,
+                (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.post_id) AS like_count,
+                (SELECT COUNT(*)::int FROM comments WHERE post_id = p.post_id AND parent_comment_id IS NULL) AS comment_count,
+                EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.post_id AND user_id = $2) AS liked_by_me
+            FROM posts p
+            JOIN users u ON p.user_id = u.user_id
+            LEFT JOIN profiles pr ON u.user_id = pr.user_id
+            WHERE p.post_id = $1`,
+            [postId, userId]
+        );
+
+        if (!rows.length) return res.status(404).json({ message: "Post not found" });
+        res.json({ post: rows[0] });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: "Failed to load post" });
+    }
+});
+
 // ─── POST /api/feed/posts ──────────────────────────────────────────────────
 router.post("/posts", authMiddleware, upload.array("media", 4), async (req, res) => {
     try {
@@ -164,17 +193,70 @@ router.post("/posts/:postId/like", authMiddleware, async (req, res) => {
     try {
         const { postId } = req.params;
         const userId = req.user.user_id;
+        
+        // Find post author first
+        const postRes = await pool.query("SELECT user_id FROM posts WHERE post_id=$1", [postId]);
+        if (!postRes.rows.length) return res.status(404).json({ message: "Post not found" });
+        const authorId = postRes.rows[0].user_id;
+
         const existing = await pool.query(
             "SELECT like_id FROM post_likes WHERE post_id=$1 AND user_id=$2",
             [postId, userId]
         );
+        
+        let liked = false;
         if (existing.rows.length) {
             await pool.query("DELETE FROM post_likes WHERE post_id=$1 AND user_id=$2", [postId, userId]);
         } else {
             await pool.query("INSERT INTO post_likes (post_id, user_id) VALUES ($1,$2)", [postId, userId]);
+            liked = true;
         }
-        const { rows } = await pool.query("SELECT COUNT(*)::int FROM post_likes WHERE post_id=$1", [postId]);
-        res.json({ liked: !existing.rows.length, like_count: rows[0].count });
+
+        // Trigger Notification Logic (Instagram space-saving aggregated style)
+        if (String(authorId) !== String(userId)) {
+            if (liked) {
+                // Check if notification already exists
+                const notifExists = await pool.query(
+                    "SELECT notification_id FROM notifications WHERE recipient_id=$1 AND post_id=$2 AND notification_type='like'",
+                    [authorId, postId]
+                );
+                if (notifExists.rows.length) {
+                    // Update latest liker and make unread
+                    await pool.query(
+                        "UPDATE notifications SET sender_id=$1, is_read=FALSE, updated_at=NOW() WHERE recipient_id=$2 AND post_id=$3 AND notification_type='like'",
+                        [userId, authorId, postId]
+                    );
+                } else {
+                    // Insert new notification
+                    await pool.query(
+                        "INSERT INTO notifications (recipient_id, sender_id, notification_type, post_id) VALUES ($1, $2, 'like', $3)",
+                        [authorId, userId, postId]
+                    );
+                }
+            } else {
+                // If unliked, check for next most recent liker to show
+                const otherLikes = await pool.query(
+                    "SELECT user_id FROM post_likes WHERE post_id=$1 AND user_id!=$2 ORDER BY created_at DESC LIMIT 1",
+                    [postId, authorId]
+                );
+                if (otherLikes.rows.length) {
+                    // Update notification with the next recent liker
+                    await pool.query(
+                        "UPDATE notifications SET sender_id=$1, updated_at=NOW() WHERE recipient_id=$2 AND post_id=$3 AND notification_type='like'",
+                        [otherLikes.rows[0].user_id, authorId, postId]
+                    );
+                } else {
+                    // Delete notification if no other likes exist
+                    await pool.query(
+                        "DELETE FROM notifications WHERE recipient_id=$1 AND post_id=$2 AND notification_type='like'",
+                        [authorId, postId]
+                    );
+                }
+            }
+        }
+
+        const { rows: countRows } = await pool.query("SELECT COUNT(*)::int FROM post_likes WHERE post_id=$1", [postId]);
+        res.json({ liked, like_count: countRows[0].count });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Failed to toggle like" });
@@ -233,6 +315,36 @@ router.post("/posts/:postId/comments", authMiddleware, async (req, res) => {
              VALUES ($1,$2,$3,$4) RETURNING *`,
             [postId, userId, content.trim(), parent_comment_id || null]
         );
+        const commentId = rows[0].comment_id;
+
+        // Find post author for notification
+        const postRes = await pool.query("SELECT user_id FROM posts WHERE post_id=$1", [postId]);
+        if (postRes.rows.length) {
+            const authorId = postRes.rows[0].user_id;
+            
+            // 1. Notify post author (unless they comment on their own post)
+            if (String(authorId) !== String(userId)) {
+                await pool.query(
+                    "INSERT INTO notifications (recipient_id, sender_id, notification_type, post_id, comment_id) VALUES ($1, $2, 'comment', $3, $4)",
+                    [authorId, userId, 'comment', postId, commentId]
+                );
+            }
+
+            // 2. Notify parent commenter if this is a reply (unless they reply to themselves, or parent author is post author to avoid duplicates)
+            if (parent_comment_id) {
+                const parentRes = await pool.query("SELECT user_id FROM comments WHERE comment_id=$1", [parent_comment_id]);
+                if (parentRes.rows.length) {
+                    const parentAuthorId = parentRes.rows[0].user_id;
+                    if (String(parentAuthorId) !== String(userId) && String(parentAuthorId) !== String(authorId)) {
+                        await pool.query(
+                            "INSERT INTO notifications (recipient_id, sender_id, notification_type, post_id, comment_id) VALUES ($1, $2, 'comment', $3, $4)",
+                            [parentAuthorId, userId, 'comment', postId, commentId]
+                        );
+                    }
+                }
+            }
+        }
+
         const { rows: u } = await pool.query(
             `SELECT u.username, pr.display_name, pr.profile_picture, pr.profile_color FROM users u LEFT JOIN profiles pr ON u.user_id=pr.user_id WHERE u.user_id=$1`,
             [userId]

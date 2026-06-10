@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Home, Bell, User, LogOut, Settings, Sun, Moon, Users, MessageCircle,
   Camera, Save, AlertCircle, CheckCircle, ChevronRight, Lock, Mail, AtSign, Palette
@@ -44,6 +44,27 @@ export default function SettingsPage() {
   const [savingColor, setSavingColor] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const picRef = useRef<HTMLInputElement>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/notifications/unread-count`);
+      if (r.ok) {
+        const d = await r.json();
+        setUnreadCount(d.count || 0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      const interval = setInterval(fetchUnreadCount, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadCount]);
 
   // Profile form
   const [displayName, setDisplayName] = useState("");
@@ -176,10 +197,27 @@ export default function SettingsPage() {
         <div className={styles.sideWordmark}>Social</div>
         <nav className={styles.sideNav}>
           <div className={styles.sideItem} onClick={() => router.push("/feed")}><Home size={20} /><span>Home</span></div>
-          <div className={styles.sideItem}><Bell size={20} /><span>Notifications</span></div>
+          <div className={styles.sideItem} onClick={() => router.push("/notifications")}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "#e74c3c", color: "white",
+                  borderRadius: "100%", width: 15, height: 15,
+                  fontSize: 9, fontWeight: 700,
+                  display: "flex", alignItems: "center",
+                  justifyContent: "center", border: "1.5px solid var(--color-canvas)"
+                }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </div>
+            <span>Notifications</span>
+          </div>
           <div className={styles.sideItem} onClick={() => router.push("/people")}><Users size={20} /><span>People</span></div>
           <div className={styles.sideItem} onClick={() => router.push(`/${user.username}`)}><User size={20} /><span>Profile</span></div>
-          <div className={styles.sideItem}><MessageCircle size={20} /><span>Messages</span></div>
+          <div className={styles.sideItem} onClick={() => router.push("/messages")}><MessageCircle size={20} /><span>Messages</span></div>
           <div className={`${styles.sideItem} ${styles.sideActive}`} onClick={() => router.push("/settings")}><Settings size={20} /><span>Settings</span></div>
         </nav>
         <div className={styles.sideFooter}>

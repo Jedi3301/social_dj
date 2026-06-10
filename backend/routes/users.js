@@ -148,10 +148,35 @@ router.post("/follow/:userId", authMiddleware, async (req, res) => {
         );
         if (existing.rows.length) {
             await pool.query("DELETE FROM follows WHERE follower_id=$1 AND following_id=$2", [followerId, followingId]);
+            
+            // Delete follow notification
+            await pool.query(
+                "DELETE FROM notifications WHERE recipient_id=$1 AND sender_id=$2 AND notification_type='follow'",
+                [followingId, followerId]
+            );
+
             const { rows } = await pool.query("SELECT COUNT(*)::int FROM follows WHERE following_id=$1", [followingId]);
             return res.json({ following: false, followers_count: rows[0].count });
         } else {
             await pool.query("INSERT INTO follows (follower_id, following_id) VALUES ($1,$2)", [followerId, followingId]);
+            
+            // Trigger Follow Notification
+            const notifExists = await pool.query(
+                "SELECT notification_id FROM notifications WHERE recipient_id=$1 AND sender_id=$2 AND notification_type='follow'",
+                [followingId, followerId]
+            );
+            if (notifExists.rows.length) {
+                await pool.query(
+                    "UPDATE notifications SET is_read=FALSE, updated_at=NOW() WHERE recipient_id=$1 AND sender_id=$2 AND notification_type='follow'",
+                    [followingId, followerId]
+                );
+            } else {
+                await pool.query(
+                    "INSERT INTO notifications (recipient_id, sender_id, notification_type) VALUES ($1, $2, 'follow')",
+                    [followingId, followerId]
+                );
+            }
+
             const { rows } = await pool.query("SELECT COUNT(*)::int FROM follows WHERE following_id=$1", [followingId]);
             return res.json({ following: true, followers_count: rows[0].count });
         }

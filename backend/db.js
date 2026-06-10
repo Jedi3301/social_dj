@@ -135,6 +135,25 @@ const pool = new Pool(poolConfig);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_comments_parent_comment_id ON comments(parent_comment_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_follows_following_id ON follows(following_id)`);
 
+        // Create Notifications table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS notifications (
+                notification_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                recipient_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                sender_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                notification_type VARCHAR(20) NOT NULL CHECK (notification_type IN ('like', 'comment', 'follow')),
+                post_id UUID REFERENCES posts(post_id) ON DELETE CASCADE,
+                comment_id UUID REFERENCES comments(comment_id) ON DELETE CASCADE,
+                is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        // Create performance index for notifications lookup
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_recipient_id ON notifications(recipient_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_updated_at ON notifications(updated_at DESC)`);
+
         // Recalculate metrics from existing posts to ensure it's sync'd
         await pool.query(`
             INSERT INTO hashtag_metrics (hashtag, post_count)

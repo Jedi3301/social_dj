@@ -75,6 +75,7 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [repliesExpanded, setRepliesExpanded] = useState(false);
 
   const toggleLike = async () => {
     const r = await authFetch(`${API}/api/feed/comments/${comment.comment_id}/like`, { method: "POST" });
@@ -89,7 +90,13 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: replyText.trim(), parent_comment_id: comment.comment_id }),
     });
-    if (r.ok) { const c: Comment = await r.json(); onUpdate(comment.comment_id, { replies: [...comment.replies, { ...c, replies: [] }] }); setReplyText(""); setReplyOpen(false); }
+    if (r.ok) {
+      const c: Comment = await r.json();
+      onUpdate(comment.comment_id, { replies: [...comment.replies, { ...c, replies: [] }] });
+      setReplyText("");
+      setReplyOpen(false);
+      setRepliesExpanded(true); // Auto expand replies when replying
+    }
     setPosting(false);
   };
 
@@ -127,7 +134,23 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
             </button>
           </div>
         )}
-        {comment.replies.map(r => (
+        
+        {comment.replies.length > 0 && (
+          <button
+            onClick={() => setRepliesExpanded(!repliesExpanded)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: "12px", fontWeight: 600, color: "var(--color-ink)",
+              opacity: 0.6, display: "flex", alignItems: "center", gap: "6px",
+              padding: "4px 0", marginTop: "4px", fontFamily: "inherit"
+            }}
+          >
+            <span style={{ width: "16px", height: "1.5px", background: "var(--color-hairline)", display: "inline-block" }} />
+            {repliesExpanded ? "Hide replies" : `View replies (${comment.replies.length})`}
+          </button>
+        )}
+
+        {repliesExpanded && comment.replies.map(r => (
           <CommentItem key={r.comment_id} comment={r} postId={postId} currentUserId={currentUserId}
             depth={depth + 1} onDelete={onDelete} onUpdate={onUpdate} />
         ))}
@@ -245,8 +268,16 @@ function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUs
         )}
       </div>
 
-      {post.content && <p className={styles.postContent}>{post.content}</p>}
-      {post.media_urls?.length > 0 && <MediaGrid urls={post.media_urls} type={post.post_type} />}
+      {post.content && (
+        <p className={styles.postContent} onClick={() => router.push(`/post/${post.post_id}`)} style={{ cursor: "pointer" }}>
+          {post.content}
+        </p>
+      )}
+      {post.media_urls?.length > 0 && (
+        <div onClick={() => router.push(`/post/${post.post_id}`)} style={{ cursor: "pointer" }}>
+          <MediaGrid urls={post.media_urls} type={post.post_type} />
+        </div>
+      )}
 
       <div className={styles.postActions}>
         <button className={`${styles.actionBtn} ${post.liked_by_me ? styles.likedBtn : ""}`} onClick={toggleLike}>
@@ -384,6 +415,28 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(true);
   const [dark, setDark] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
+  
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/notifications/unread-count`);
+      if (r.ok) {
+        const d = await r.json();
+        setUnreadCount(d.count || 0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      const interval = setInterval(fetchUnreadCount, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadCount]);
 
   // Persist dark mode
   useEffect(() => {
@@ -469,8 +522,23 @@ export default function FeedPage() {
             <div className={`${styles.sideItem} ${styles.sideActive}`} onClick={() => router.push("/feed")}>
               <Home size={20} /><span>Home</span>
             </div>
-            <div className={styles.sideItem}>
-              <Bell size={20} /><span>Notifications</span>
+            <div className={styles.sideItem} onClick={() => router.push("/notifications")}>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                <Bell size={20} />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: "absolute", top: -4, right: -4,
+                    background: "#e74c3c", color: "white",
+                    borderRadius: "100%", width: 15, height: 15,
+                    fontSize: 9, fontWeight: 700,
+                    display: "flex", alignItems: "center",
+                    justifyContent: "center", border: "1.5px solid var(--color-canvas)"
+                  }}>
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </div>
+              <span>Notifications</span>
             </div>
             <div className={styles.sideItem} onClick={() => router.push("/people")}>
               <Users size={20} /><span>People</span>
@@ -576,9 +644,25 @@ export default function FeedPage() {
 
       {/* ── Mobile bottom nav ── */}
       <nav className={styles.bottomNav}>
-        <button className={`${styles.bottomBtn} ${styles.bottomActive}`}><Home size={22} /></button>
-        <button className={styles.bottomBtn}><Bell size={22} /></button>
-        <button className={styles.bottomBtn}><User size={22} /></button>
+        <button className={`${styles.bottomBtn} ${styles.bottomActive}`} onClick={() => router.push("/feed")}><Home size={22} /></button>
+        <button className={styles.bottomBtn} onClick={() => router.push("/notifications")}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Bell size={22} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute", top: -3, right: -3,
+                background: "#e74c3c", color: "white",
+                borderRadius: "100%", width: 14, height: 14,
+                fontSize: 8, fontWeight: 700,
+                display: "flex", alignItems: "center",
+                justifyContent: "center", border: "1.5px solid var(--color-canvas)"
+              }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
+        </button>
+        <button className={styles.bottomBtn} onClick={() => user && router.push(`/${user.username}`)}><User size={22} /></button>
         <button className={styles.bottomBtn} onClick={handleLogout}><LogOut size={22} /></button>
       </nav>
     </div>

@@ -3,7 +3,7 @@
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Heart, MessageCircle, Share2, Trash2, Home, Bell, User, LogOut, Sun, Moon, Search, MapPin, Link as LinkIcon, MoreHorizontal, Send, Settings, Users, UserPlus, UserCheck
+  Heart, MessageCircle, Share2, Trash2, Home, Bell, User, LogOut, Sun, Moon, Search, MapPin, Link as LinkIcon, MoreHorizontal, Send, Settings, Users, UserPlus, UserCheck, X
 } from "lucide-react";
 import { Toggle, GooeyFilter } from "@/components/ui/toggle";
 import styles from "../feed/feed.module.css";
@@ -70,6 +70,7 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [posting, setPosting] = useState(false);
+  const [repliesExpanded, setRepliesExpanded] = useState(false);
 
   const toggleLike = async () => {
     const r = await authFetch(`${API}/api/feed/comments/${comment.comment_id}/like`, { method: "POST" });
@@ -84,7 +85,13 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: replyText.trim(), parent_comment_id: comment.comment_id }),
     });
-    if (r.ok) { const c: Comment = await r.json(); onUpdate(comment.comment_id, { replies: [...comment.replies, { ...c, replies: [] }] }); setReplyText(""); setReplyOpen(false); }
+    if (r.ok) {
+      const c: Comment = await r.json();
+      onUpdate(comment.comment_id, { replies: [...comment.replies, { ...c, replies: [] }] });
+      setReplyText("");
+      setReplyOpen(false);
+      setRepliesExpanded(true); // Auto expand replies when replying
+    }
     setPosting(false);
   };
 
@@ -122,7 +129,23 @@ function CommentItem({ comment, postId, currentUserId, depth = 0, onDelete, onUp
             </button>
           </div>
         )}
-        {comment.replies.map(r => (
+
+        {comment.replies.length > 0 && (
+          <button
+            onClick={() => setRepliesExpanded(!repliesExpanded)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              fontSize: "12px", fontWeight: 600, color: "var(--color-ink)",
+              opacity: 0.6, display: "flex", alignItems: "center", gap: "6px",
+              padding: "4px 0", marginTop: "4px", fontFamily: "inherit"
+            }}
+          >
+            <span style={{ width: "16px", height: "1.5px", background: "var(--color-hairline)", display: "inline-block" }} />
+            {repliesExpanded ? "Hide replies" : `View replies (${comment.replies.length})`}
+          </button>
+        )}
+
+        {repliesExpanded && comment.replies.map(r => (
           <CommentItem key={r.comment_id} comment={r} postId={postId} currentUserId={currentUserId}
             depth={depth + 1} onDelete={onDelete} onUpdate={onUpdate} />
         ))}
@@ -240,8 +263,16 @@ function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUs
         )}
       </div>
 
-      {post.content && <p className={styles.postContent}>{post.content}</p>}
-      {post.media_urls?.length > 0 && <MediaGrid urls={post.media_urls} type={post.post_type} />}
+      {post.content && (
+        <p className={styles.postContent} onClick={() => router.push(`/post/${post.post_id}`)} style={{ cursor: "pointer" }}>
+          {post.content}
+        </p>
+      )}
+      {post.media_urls?.length > 0 && (
+        <div onClick={() => router.push(`/post/${post.post_id}`)} style={{ cursor: "pointer" }}>
+          <MediaGrid urls={post.media_urls} type={post.post_type} />
+        </div>
+      )}
 
       <div className={styles.postActions}>
         <button className={`${styles.actionBtn} ${post.liked_by_me ? styles.likedBtn : ""}`} onClick={toggleLike}>
@@ -297,6 +328,52 @@ function ProfileSuggestionItem({ user, onNavigate }: { user: UserInfo; onNavigat
   );
 }
 
+function ModalUserItem({ user, currentUserId, onNavigate, onFollowChange }: { 
+  user: UserInfo; 
+  currentUserId: string; 
+  onNavigate: () => void;
+  onFollowChange?: (userId: string, isFollowing: boolean) => void;
+}) {
+  const [following, setFollowing] = useState(!!user.is_following);
+  const [loading, setLoading] = useState(false);
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const r = await authFetch(`${API}/api/users/follow/${user.user_id}`, { method: "POST" });
+      const d = await r.json();
+      setFollowing(d.following);
+      if (onFollowChange) {
+        onFollowChange(user.user_id, d.following);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  const isSelf = String(user.user_id) === String(currentUserId);
+
+  return (
+    <div className={styles.modalUserRow} onClick={onNavigate}>
+      <Avatar user={user} size={36} />
+      <div className={styles.modalUserInfo}>
+        <span className={styles.modalUserName}>{user.display_name || user.username}</span>
+        <span className={styles.modalUserHandle}>@{user.username}</span>
+      </div>
+      {!isSelf && (
+        <button
+          className={`btn btn-secondary ${styles.modalUserFollowBtn}`}
+          onClick={handleFollow}
+          disabled={loading}
+          style={following ? { opacity: 0.6 } : {}}
+        >
+          {following ? "Following" : "Follow"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const params = useParams();
@@ -316,6 +393,57 @@ export default function ProfilePage() {
   
   const [trends, setTrends] = useState<{ id: number; category: string; name: string; count: string }[]>([]);
   const [suggestions, setSuggestions] = useState<UserInfo[]>([]);
+
+  const [modalOpen, setModalOpen] = useState<'followers' | 'following' | null>(null);
+  const [modalUsers, setModalUsers] = useState<UserInfo[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalQuery, setModalQuery] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/notifications/unread-count`);
+      if (r.ok) {
+        const d = await r.json();
+        setUnreadCount(d.count || 0);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      const interval = setInterval(fetchUnreadCount, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [user, fetchUnreadCount]);
+
+  const openModal = async (type: 'followers' | 'following') => {
+    if (!profile) return;
+    setModalOpen(type);
+    setModalLoading(true);
+    setModalQuery("");
+    try {
+      const r = await authFetch(`${API}/api/users/${profile.user_id}/${type}`);
+      const d = await r.json();
+      setModalUsers(d.users || []);
+    } catch (err) {
+      console.error(err);
+      setModalUsers([]);
+    }
+    setModalLoading(false);
+  };
+
+  const filteredModalUsers = modalUsers.filter(u => {
+    const q = modalQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (u.username || "").toLowerCase().includes(q) ||
+      (u.display_name || "").toLowerCase().includes(q)
+    );
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem("theme");
@@ -424,8 +552,23 @@ export default function ProfilePage() {
           <div className={styles.sideItem} onClick={() => router.push("/feed")}>
             <Home size={20} /><span>Home</span>
           </div>
-          <div className={styles.sideItem}>
-            <Bell size={20} /><span>Notifications</span>
+          <div className={styles.sideItem} onClick={() => router.push("/notifications")}>
+            <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              <Bell size={20} />
+              {unreadCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  background: "#e74c3c", color: "white",
+                  borderRadius: "100%", width: 15, height: 15,
+                  fontSize: 9, fontWeight: 700,
+                  display: "flex", alignItems: "center",
+                  justifyContent: "center", border: "1.5px solid var(--color-canvas)"
+                }}>
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </div>
+            <span>Notifications</span>
           </div>
           <div className={styles.sideItem} onClick={() => router.push("/people")}>
             <Users size={20} /><span>People</span>
@@ -525,8 +668,12 @@ export default function ProfilePage() {
                     </div>
                     {profile.bio && <p style={{ marginTop: 16, fontSize: 14, opacity: 0.75, lineHeight: 1.5, maxWidth: 400 }}>{profile.bio}</p>}
                     <div style={{ display: "flex", gap: 24, marginTop: 16, fontSize: 14 }}>
-                        <span><strong>{profile.followers_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>followers</span></span>
-                        <span><strong>{profile.following_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>following</span></span>
+                        <span onClick={() => openModal("followers")} style={{ cursor: "pointer", transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+                          <strong>{profile.followers_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>followers</span>
+                        </span>
+                        <span onClick={() => openModal("following")} style={{ cursor: "pointer", transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "0.7"} onMouseLeave={e => e.currentTarget.style.opacity = "1"}>
+                          <strong>{profile.following_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>following</span>
+                        </span>
                     </div>
                 </div>
             </div>
@@ -594,10 +741,96 @@ export default function ProfilePage() {
       {/* ── Mobile bottom nav ── */}
       <nav className={styles.bottomNav}>
         <button className={styles.bottomBtn} onClick={() => router.push("/feed")}><Home size={22} /></button>
-        <button className={styles.bottomBtn}><Bell size={22} /></button>
+        <button className={styles.bottomBtn} onClick={() => router.push("/notifications")}>
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Bell size={22} />
+            {unreadCount > 0 && (
+              <span style={{
+                position: "absolute", top: -3, right: -3,
+                background: "#e74c3c", color: "white",
+                borderRadius: "100%", width: 14, height: 14,
+                fontSize: 8, fontWeight: 700,
+                display: "flex", alignItems: "center",
+                justifyContent: "center", border: "1.5px solid var(--color-canvas)"
+              }}>
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
+          </div>
+        </button>
         <button className={`${styles.bottomBtn} ${user.username === targetUsername ? styles.bottomActive : ""}`} onClick={() => router.push(`/${user.username}`)}><User size={22} /></button>
         <button className={styles.bottomBtn} onClick={handleLogout}><LogOut size={22} /></button>
       </nav>
+
+      {/* ── Followers/Following Overlay Modal ── */}
+      {modalOpen && (
+        <div className={styles.modalOverlay} onClick={() => setModalOpen(null)}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>
+                {modalOpen === "followers" ? "Followers" : "Following"}
+              </h3>
+              <button className={styles.modalClose} onClick={() => setModalOpen(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className={styles.modalSearchBox}>
+              <Search size={14} className={styles.modalSearchIcon} />
+              <input
+                type="text"
+                placeholder="Search..."
+                className={styles.modalSearchInput}
+                value={modalQuery}
+                onChange={e => setModalQuery(e.target.value)}
+              />
+            </div>
+
+            <div className={styles.modalBody}>
+              {modalLoading ? (
+                <div className={styles.modalLoader}>
+                  <span className="spinner" />
+                </div>
+              ) : filteredModalUsers.length === 0 ? (
+                <div className={styles.modalEmpty}>
+                  No users found
+                </div>
+              ) : (
+                filteredModalUsers.map(u => (
+                  <ModalUserItem
+                    key={u.user_id}
+                    user={u}
+                    currentUserId={user.user_id}
+                    onNavigate={() => {
+                      setModalOpen(null);
+                      router.push(`/${u.username}`);
+                    }}
+                    onFollowChange={(userId, isFollowing) => {
+                      // Update profile following_count if current user unfollows someone on their own profile
+                      if (String(profile?.user_id) === String(user.user_id)) {
+                        if (modalOpen === "following") {
+                          setProfile(prev => prev ? {
+                            ...prev,
+                            following_count: Math.max(0, (prev.following_count ?? 0) + (isFollowing ? 1 : -1))
+                          } : null);
+                        }
+                      }
+                      // If target user is the profile owner being viewed, and current user toggles follow, update profile followers_count
+                      if (String(userId) === String(profile?.user_id)) {
+                        setProfile(prev => prev ? {
+                          ...prev,
+                          followers_count: Math.max(0, (prev.followers_count ?? 0) + (isFollowing ? 1 : -1))
+                        } : null);
+                        setFollowing(isFollowing);
+                      }
+                    }}
+                  />
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

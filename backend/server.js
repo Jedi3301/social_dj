@@ -8,6 +8,7 @@ const authRoutes = require("./routes/auth");
 const feedRoutes = require("./routes/feed");
 const usersRoutes = require("./routes/users");
 const trendsRoutes = require("./routes/trends");
+const notificationsRoutes = require("./routes/notifications");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/feed", feedRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/trends", trendsRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     app.listen(5000, () => {
