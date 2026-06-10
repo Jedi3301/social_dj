@@ -40,9 +40,12 @@ const pool = new Pool(poolConfig);
                 last_name VARCHAR(100) NOT NULL,
                 display_name VARCHAR(200),
                 profile_picture VARCHAR(500),
-                bio TEXT
+                bio TEXT,
+                profile_color VARCHAR(20)
             )
         `);
+        // Add profile_color to existing tables that may not have it yet
+        await pool.query(`ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_color VARCHAR(20)`);
 
         // Create Posts table
         await pool.query(`
@@ -97,6 +100,21 @@ const pool = new Pool(poolConfig);
                 hashtag VARCHAR(100) PRIMARY KEY,
                 post_count INT NOT NULL DEFAULT 0
             )
+        `);
+
+        // Create Follows table
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS follows (
+                follower_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                following_id BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                PRIMARY KEY (follower_id, following_id)
+            )
+        `);
+
+        // Add profile_color column if it doesn't exist yet (safe migration)
+        await pool.query(`
+            ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_color VARCHAR(20)
         `);
 
         // Recalculate metrics from existing posts to ensure it's sync'd

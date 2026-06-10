@@ -11,7 +11,23 @@ const trendsRoutes = require("./routes/trends");
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://social-dj.vercel.app",
+    process.env.FRONTEND_URL, // allow override via env var
+].filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. mobile apps, curl, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // Also allow any *.vercel.app subdomain for preview deployments
+        if (/\.vercel\.app$/.test(origin)) return callback(null, true);
+        callback(new Error(`CORS: Origin ${origin} not allowed`));
+    },
+    credentials: true,
+}));
 app.use(express.json());
 
 // Serve uploaded media files statically
