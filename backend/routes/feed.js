@@ -36,23 +36,69 @@ router.get("/", authMiddleware, async (req, res) => {
         const offset = (Number(page) - 1) * Number(limit);
         const userId = req.user.user_id;
 
-        const { rows } = await pool.query(
-            `SELECT
-                p.post_id, p.content, p.post_type, p.media_urls, p.created_at,
-                u.user_id, u.username,
-                pr.display_name, pr.profile_picture, pr.profile_color,
-                (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.post_id) AS like_count,
-                (SELECT COUNT(*)::int FROM comments WHERE post_id = p.post_id AND parent_comment_id IS NULL) AS comment_count,
-                EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.post_id AND user_id = $3) AS liked_by_me
-            FROM posts p
-            JOIN users u ON p.user_id = u.user_id
-            LEFT JOIN profiles pr ON u.user_id = pr.user_id
-            ORDER BY p.created_at DESC
-            LIMIT $1 OFFSET $2`,
-            [limit, offset, userId]
-        );
+        let posts = [];
+        let cacheHit = false;
 
-        res.json({ posts: rows, page: Number(page), hasMore: rows.length === Number(limit) });
+        const { redisClient, isRedisEnabled } = require("../config/redis");
+
+        // Try Redis first if enabled
+        if (isRedisEnabled() && redisClient) {
+            const cacheKey = `global:feed:page:${page}:limit:${limit}`;
+            try {
+                const cached = await redisClient.get(cacheKey);
+                if (cached) {
+                    posts = JSON.parse(cached);
+                    cacheHit = true;
+                }
+            } catch (cacheErr) {
+                console.error("Redis read error:", cacheErr.message);
+            }
+        }
+
+        if (!cacheHit) {
+            // Cache Miss: Query PostgreSQL (excluding user-specific liked_by_me)
+            const { rows } = await pool.query(
+                `SELECT
+                    p.post_id, p.content, p.post_type, p.media_urls, p.created_at,
+                    u.user_id, u.username,
+                    pr.display_name, pr.profile_picture, pr.profile_color,
+                    (SELECT COUNT(*)::int FROM post_likes WHERE post_id = p.post_id) AS like_count,
+                    (SELECT COUNT(*)::int FROM comments WHERE post_id = p.post_id AND parent_comment_id IS NULL) AS comment_count
+                FROM posts p
+                JOIN users u ON p.user_id = u.user_id
+                LEFT JOIN profiles pr ON u.user_id = pr.user_id
+                ORDER BY p.created_at DESC
+                LIMIT $1 OFFSET $2`,
+                [Number(limit), offset]
+            );
+            posts = rows;
+
+            // Save to Redis (expire in 5 minutes)
+            if (isRedisEnabled() && redisClient && posts.length > 0) {
+                const cacheKey = `global:feed:page:${page}:limit:${limit}`;
+                try {
+                    await redisClient.set(cacheKey, JSON.stringify(posts), "EX", 300);
+                } catch (cacheErr) {
+                    console.error("Redis write error:", cacheErr.message);
+                }
+            }
+        }
+
+        // Dynamically compute user-specific liked_by_me locally
+        if (posts.length > 0) {
+            const postIds = posts.map(p => p.post_id);
+            const { rows: likedRows } = await pool.query(
+                `SELECT post_id FROM post_likes WHERE user_id = $1 AND post_id = ANY($2::uuid[])`,
+                [userId, postIds]
+            );
+            const likedSet = new Set(likedRows.map(r => r.post_id));
+            posts = posts.map(p => ({
+                ...p,
+                liked_by_me: likedSet.has(p.post_id)
+            }));
+        }
+
+        res.json({ posts, page: Number(page), hasMore: posts.length === Number(limit) });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: "Failed to load feed" });
@@ -114,19 +160,9 @@ router.post("/posts", authMiddleware, upload.array("media", 4), async (req, res)
             [userId, content?.trim() || null, postType, mediaUrls]
         );
 
-        // Update hashtag metrics table
-        const postContent = content?.trim();
-        const hashtags = postContent ? [...new Set(postContent.match(/#[A-Za-z0-9_]+/g))] : [];
-        if (hashtags.length > 0) {
-            for (const tag of hashtags) {
-                await pool.query(
-                    `INSERT INTO hashtag_metrics (hashtag, post_count)
-                     VALUES ($1, 1)
-                     ON CONFLICT (hashtag) DO UPDATE SET post_count = hashtag_metrics.post_count + 1`,
-                    [tag]
-                );
-            }
-        }
+        // Offload post parsing, hashtag metrics update, and cache invalidation to BullMQ
+        const { queuePostProcessing } = require("../queues/feedQueue");
+        await queuePostProcessing(userId, rows[0].post_id, content);
 
         const { rows: userRows } = await pool.query(
             `SELECT u.username, pr.display_name, pr.profile_picture, pr.profile_color
@@ -181,6 +217,8 @@ router.delete("/posts/:postId", authMiddleware, async (req, res) => {
             }
         }
 
+        const { invalidateFeedCache } = require("../config/redis");
+        await invalidateFeedCache();
         res.json({ message: "Deleted" });
     } catch (err) {
         console.error(err);
@@ -256,6 +294,8 @@ router.post("/posts/:postId/like", authMiddleware, async (req, res) => {
         }
 
         const { rows: countRows } = await pool.query("SELECT COUNT(*)::int FROM post_likes WHERE post_id=$1", [postId]);
+        const { invalidateFeedCache } = require("../config/redis");
+        await invalidateFeedCache();
         res.json({ liked, like_count: countRows[0].count });
     } catch (err) {
         console.error(err);
@@ -349,6 +389,8 @@ router.post("/posts/:postId/comments", authMiddleware, async (req, res) => {
             `SELECT u.username, pr.display_name, pr.profile_picture, pr.profile_color FROM users u LEFT JOIN profiles pr ON u.user_id=pr.user_id WHERE u.user_id=$1`,
             [userId]
         );
+        const { invalidateFeedCache } = require("../config/redis");
+        await invalidateFeedCache();
         res.status(201).json({ ...rows[0], ...u[0], like_count: 0, liked_by_me: false, replies: [] });
     } catch (err) {
         console.error(err);
@@ -386,6 +428,8 @@ router.delete("/comments/:commentId", authMiddleware, async (req, res) => {
             [req.params.commentId, req.user.user_id]
         );
         if (!rows.length) return res.status(404).json({ message: "Not found or unauthorized" });
+        const { invalidateFeedCache } = require("../config/redis");
+        await invalidateFeedCache();
         res.json({ message: "Deleted" });
     } catch (err) {
         console.error(err);

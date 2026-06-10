@@ -12,6 +12,11 @@ const notificationsRoutes = require("./routes/notifications");
 
 const app = express();
 
+// Initialize BullMQ queues and background workers (disabled in serverless environments like Vercel)
+if (!process.env.VERCEL) {
+    require("./queues/feedQueue");
+}
+
 const allowedOrigins = [
     "http://localhost:3000",
     "https://social-dj.vercel.app",
