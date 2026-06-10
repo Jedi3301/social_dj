@@ -128,6 +128,8 @@ export default function SettingsPage() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.message);
       setUser(prev => prev ? { ...prev, ...d.profile } : d.profile);
+      setPicPreview(null);
+      setPicFile(null);
       setStatus({ type: "success", msg: "Profile updated successfully!" });
     } catch (err: unknown) {
       setStatus({ type: "error", msg: err instanceof Error ? err.message : "Update failed" });
@@ -176,7 +178,7 @@ export default function SettingsPage() {
   };
 
   const avatarSrc = picPreview || (user?.profile_picture
-    ? (user.profile_picture.startsWith("http") ? user.profile_picture : `${API}${user.profile_picture}`)
+    ? (user.profile_picture.startsWith("http") || user.profile_picture.startsWith("data:") ? user.profile_picture : `${API}${user.profile_picture}`)
     : null);
 
   const initials = (u: UserInfo) =>

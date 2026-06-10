@@ -342,11 +342,11 @@ function CreateBox({ currentUser, onCreated }: { currentUser: UserInfo; onCreate
         <div className={styles.previewRow}>
           {previews.map((p, i) => (
             <div key={i} className={styles.previewItem}>
-              {files[i]?.type.startsWith("video/")
+              {files[i]?.type?.startsWith("video/")
                 ? <video src={p} className={styles.previewMedia} />
                 // eslint-disable-next-line @next/next/no-img-element
                 : <img src={p} alt="" className={styles.previewMedia} />}
-              <button className={styles.previewX} onClick={() => removeFile(i)}>✕</button>
+              <button type="button" className={styles.previewX} onClick={() => removeFile(i)}>✕</button>
             </div>
           ))}
         </div>
@@ -354,13 +354,18 @@ function CreateBox({ currentUser, onCreated }: { currentUser: UserInfo; onCreate
 
       <div className={styles.createBottom}>
         <div className={styles.mediaButtons}>
-          <button className={styles.mediaBtn} onClick={() => fileRef.current?.click()} title="Photo / Video">
+          <button type="button" className={styles.mediaBtn} onClick={() => fileRef.current?.click()} title="Photo / Video">
             <Image size={19} />
           </button>
-          <button className={styles.mediaBtn} onClick={() => fileRef.current?.click()} title="Video">
+          <button type="button" className={styles.mediaBtn} onClick={() => fileRef.current?.click()} title="Video">
             <Video size={19} />
           </button>
           <input ref={fileRef} type="file" accept="image/*,video/*" multiple hidden onChange={handleFiles} />
+          {files.length > 0 && (
+            <span className={styles.selectedCount}>
+              {files.length} {files.length === 1 ? "file" : "files"} selected
+            </span>
+          )}
         </div>
         <button className={`btn btn-primary ${styles.postBtn}`} onClick={submit} disabled={!canPost}>
           {creating ? <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2, borderColor: "currentColor", borderTopColor: "transparent" }} /> : "Post"}
