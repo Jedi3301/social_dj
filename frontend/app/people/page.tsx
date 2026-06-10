@@ -32,7 +32,7 @@ function authFetch(url: string, opts: RequestInit = {}) {
 function Avatar({ user, size = 40 }: { user: { display_name: string | null; username: string; profile_picture?: string | null; profile_color?: string | null } | null; size?: number }) {
   if (!user) return <div style={{ width: size, height: size, borderRadius: "50%", background: "var(--color-surface-soft)" }} />;
   const hasPic = !!user.profile_picture;
-  const src = hasPic ? (user.profile_picture!.startsWith("http") ? user.profile_picture! : `${API}${user.profile_picture}`) : "";
+  const src = hasPic ? (user.profile_picture!.startsWith("http") || user.profile_picture!.startsWith("data:") ? user.profile_picture! : `${API}${user.profile_picture}`) : "";
   const inits = ((user.display_name || user.username) || "").split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
   return (
     <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36, background: user.profile_color || "var(--color-block-lilac)" }}>

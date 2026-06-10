@@ -33,7 +33,7 @@ function Avatar({ user, size = 40 }: { user: { display_name: string | null; user
     );
   }
   const hasPic = !!user.profile_picture;
-  const src = hasPic ? (user.profile_picture?.startsWith("http") ? user.profile_picture : `${API}${user.profile_picture}`) : "";
+  const src = hasPic ? (user.profile_picture?.startsWith("http") || user.profile_picture?.startsWith("data:") ? user.profile_picture : `${API}${user.profile_picture}`) : "";
   return (
     <div className={styles.avatar} style={{ width: size, height: size, fontSize: size * 0.36, overflow: "hidden", background: user.profile_color || "var(--color-block-lilac)" }}>
       {hasPic ? (

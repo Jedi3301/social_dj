@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [dark, setDark] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [saving, setSaving] = useState(false);
+  const [savingColor, setSavingColor] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const picRef = useRef<HTMLInputElement>(null);
 
@@ -100,7 +101,6 @@ export default function SettingsPage() {
     const fd = new FormData();
     fd.append("display_name", displayName);
     fd.append("bio", bio);
-    fd.append("profile_color", selectedColor);
     if (picFile) fd.append("profile_picture", picFile);
     try {
       const r = await authFetch(`${API}/api/users/settings/profile`, { method: "PATCH", body: fd });
@@ -112,6 +112,24 @@ export default function SettingsPage() {
       setStatus({ type: "error", msg: err instanceof Error ? err.message : "Update failed" });
     } finally {
       setSaving(false);
+      setTimeout(() => setStatus(null), 4000);
+    }
+  };
+
+  const saveProfileColor = async () => {
+    setSavingColor(true); setStatus(null);
+    const fd = new FormData();
+    fd.append("profile_color", selectedColor);
+    try {
+      const r = await authFetch(`${API}/api/users/settings/profile`, { method: "PATCH", body: fd });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.message);
+      setUser(prev => prev ? { ...prev, ...d.profile } : d.profile);
+      setStatus({ type: "success", msg: "Accent color updated successfully!" });
+    } catch (err: unknown) {
+      setStatus({ type: "error", msg: err instanceof Error ? err.message : "Color update failed" });
+    } finally {
+      setSavingColor(false);
       setTimeout(() => setStatus(null), 4000);
     }
   };
@@ -278,6 +296,10 @@ export default function SettingsPage() {
                     title="Default"
                   />
                 </div>
+                <button className={styles.saveBtn} onClick={saveProfileColor} disabled={savingColor} style={{ marginTop: "8px", padding: "10px 20px", fontSize: "14px" }}>
+                  {savingColor ? <span className="spinner" /> : <Save size={14} />}
+                  {savingColor ? "Saving Color..." : "Save Color"}
+                </button>
               </div>
 
               <button className={styles.saveBtn} onClick={saveProfile} disabled={saving}>
