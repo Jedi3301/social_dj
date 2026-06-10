@@ -412,13 +412,73 @@ export default function ProfilePage() {
     }
   }, []);
 
+  const pollProfile = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/users/profile/${targetUsername}`);
+      if (r.ok) {
+        const d = await r.json();
+        setProfile(prev => prev ? {
+          ...prev,
+          followers_count: d.profile.followers_count,
+          following_count: d.profile.following_count,
+          is_following: d.profile.is_following,
+          bio: d.profile.bio,
+          display_name: d.profile.display_name,
+          profile_picture: d.profile.profile_picture,
+          profile_color: d.profile.profile_color
+        } : d.profile);
+        setFollowing(!!d.profile.is_following);
+      }
+    } catch (err) {
+      console.error("Failed to poll profile:", err);
+    }
+  }, [targetUsername]);
+
+  const pollPosts = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/users/profile/${targetUsername}/posts?page=1&limit=15`);
+      if (r.ok) {
+        const d = await r.json();
+        const fresh = d.posts || [];
+        setPosts(prev => {
+          const prevMap = new Map(prev.map(p => [p.post_id, p]));
+          const newPosts = fresh.filter((p: Post) => !prevMap.has(p.post_id));
+          const updatedPrev = prev.map(p => {
+            const latest = fresh.find((f: Post) => f.post_id === p.post_id);
+            if (latest) {
+              return {
+                ...p,
+                like_count: latest.like_count,
+                comment_count: latest.comment_count,
+                liked_by_me: latest.liked_by_me,
+                display_name: latest.display_name,
+                profile_picture: latest.profile_picture,
+                profile_color: latest.profile_color
+              };
+            }
+            return p;
+          });
+          return [...newPosts, ...updatedPrev];
+        });
+      }
+    } catch (err) {
+      console.error("Failed to poll profile posts:", err);
+    }
+  }, [targetUsername]);
+
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 15000);
-      return () => clearInterval(interval);
+      const countInterval = setInterval(fetchUnreadCount, 10000);
+      const profileInterval = setInterval(pollProfile, 10000);
+      const feedInterval = setInterval(pollPosts, 10000);
+      return () => {
+        clearInterval(countInterval);
+        clearInterval(profileInterval);
+        clearInterval(feedInterval);
+      };
     }
-  }, [user, fetchUnreadCount]);
+  }, [user, fetchUnreadCount, pollProfile, pollPosts]);
 
   const openModal = async (type: 'followers' | 'following') => {
     if (!profile) return;

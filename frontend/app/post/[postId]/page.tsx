@@ -164,12 +164,45 @@ function CommentsPanel({ post, currentUser }: { post: Post; currentUser: UserInf
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
 
-  useEffect(() => {
-    fetch(`${API}/api/feed/posts/${post.post_id}/comments`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
-    })
-      .then(r => r.json()).then(d => { setComments(d.comments || []); setLoading(false); });
+  const fetchComments = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/api/feed/posts/${post.post_id}/comments`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        const fresh = d.comments || [];
+        setComments(prev => {
+          const prevMap = new Map(prev.map(c => [c.comment_id, c]));
+          
+          const mergeComments = (freshList: Comment[], parentMap: Map<string, Comment>): Comment[] => {
+            return freshList.map(fc => {
+              const pc = parentMap.get(fc.comment_id);
+              const repliesMap = new Map((pc?.replies || []).map(r => [r.comment_id, r]));
+              return {
+                ...fc,
+                replies: fc.replies ? mergeComments(fc.replies, repliesMap) : []
+              };
+            });
+          };
+          
+          return mergeComments(fresh, prevMap);
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch comments:", err);
+    }
   }, [post.post_id]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchComments().then(() => setLoading(false));
+  }, [post.post_id, fetchComments]);
+
+  useEffect(() => {
+    const interval = setInterval(fetchComments, 10000);
+    return () => clearInterval(interval);
+  }, [fetchComments]);
 
   const submit = async () => {
     if (!text.trim() || posting) return;
@@ -276,16 +309,30 @@ export default function PostDetailPage() {
       .catch(() => router.push("/login"));
   }, [router]);
 
-  // Poll notifications unread count
-  useEffect(() => {
-    if (user) {
-      fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 15000);
-      return () => clearInterval(interval);
+  const pollPost = useCallback(async () => {
+    try {
+      const r = await fetch(`${API}/api/feed/posts/${postId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+      });
+      if (r.ok) {
+        const d = await r.json();
+        setPost(prev => prev ? {
+          ...prev,
+          like_count: d.post.like_count,
+          comment_count: d.post.comment_count,
+          liked_by_me: d.post.liked_by_me,
+          content: d.post.content,
+          display_name: d.post.display_name,
+          profile_picture: d.post.profile_picture,
+          profile_color: d.post.profile_color
+        } : d.post);
+      }
+    } catch (err) {
+      console.error("Failed to poll post details:", err);
     }
-  }, [user, fetchUnreadCount]);
+  }, [postId]);
 
-  // Load post details
+  // Load post details initially
   useEffect(() => {
     if (!user || !postId) return;
     setLoading(true);
@@ -306,6 +353,19 @@ export default function PostDetailPage() {
         setLoading(false);
       });
   }, [user, postId]);
+
+  // Poll count and post updates every 10 seconds
+  useEffect(() => {
+    if (user) {
+      fetchUnreadCount();
+      const countInterval = setInterval(fetchUnreadCount, 10000);
+      const postInterval = setInterval(pollPost, 10000);
+      return () => {
+        clearInterval(countInterval);
+        clearInterval(postInterval);
+      };
+    }
+  }, [user, fetchUnreadCount, pollPost]);
 
   const toggleLike = async () => {
     if (liking || !post) return;

@@ -313,17 +313,43 @@ export default function NotificationsPage() {
     }
   }, []);
 
+  const pollNotifications = useCallback(async () => {
+    try {
+      const r = await authFetch(`${API}/api/notifications`);
+      if (r.ok) {
+        const d = await r.json();
+        const fresh = d.notifications || [];
+        setNotifications(prev => {
+          const prevMap = new Map(prev.map(n => [n.notification_id, n]));
+          return fresh.map((n: NotificationItemData) => {
+            const prevItem = prevMap.get(n.notification_id);
+            if (prevItem) {
+              return { ...n, is_following: prevItem.is_following };
+            }
+            return n;
+          });
+        });
+      }
+    } catch (err) {
+      console.error("Failed to poll notifications:", err);
+    }
+  }, []);
+
   useEffect(() => {
     if (user) {
       loadNotifications();
       fetchUnreadCount();
       loadSidebarData();
 
-      // Poll count and updates
-      const interval = setInterval(fetchUnreadCount, 15000);
-      return () => clearInterval(interval);
+      // Poll count and updates every 10 seconds
+      const countInterval = setInterval(fetchUnreadCount, 10000);
+      const notificationsInterval = setInterval(pollNotifications, 10000);
+      return () => {
+        clearInterval(countInterval);
+        clearInterval(notificationsInterval);
+      };
     }
-  }, [user, loadNotifications, fetchUnreadCount, loadSidebarData]);
+  }, [user, loadNotifications, fetchUnreadCount, pollNotifications, loadSidebarData]);
 
   const handleMarkAllRead = async () => {
     try {

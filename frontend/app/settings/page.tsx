@@ -61,7 +61,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user) {
       fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 15000);
+      const interval = setInterval(fetchUnreadCount, 10000);
       return () => clearInterval(interval);
     }
   }, [user, fetchUnreadCount]);

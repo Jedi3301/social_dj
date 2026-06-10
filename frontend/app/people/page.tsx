@@ -115,7 +115,7 @@ export default function PeoplePage() {
   useEffect(() => {
     if (me) {
       fetchUnreadCount();
-      const interval = setInterval(fetchUnreadCount, 15000);
+      const interval = setInterval(fetchUnreadCount, 10000);
       return () => clearInterval(interval);
     }
   }, [me, fetchUnreadCount]);
