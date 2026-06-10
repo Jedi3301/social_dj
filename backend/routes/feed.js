@@ -1,28 +1,14 @@
 const express = require("express");
 const multer = require("multer");
-const path = require("path");
-const crypto = require("crypto");
-const fs = require("fs");
 const authMiddleware = require("../middleware/authMiddleware");
 const pool = require("../db");
 
 const router = express.Router();
 
-// Ensure uploads dir exists
-const uploadsDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadsDir),
-    filename: (req, file, cb) => {
-        const ext = path.extname(file.originalname).toLowerCase();
-        cb(null, `${crypto.randomBytes(16).toString("hex")}${ext}`);
-    },
-});
-
+// Memory storage to support Vercel serverless functions (read-only filesystem)
 const upload = multer({
-    storage,
-    limits: { fileSize: 50 * 1024 * 1024 },
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
     fileFilter: (req, file, cb) => {
         const ok = /^(image\/(jpeg|jpg|png|gif|webp)|video\/(mp4|webm|ogg|quicktime))$/.test(file.mimetype);
         ok ? cb(null, true) : cb(new Error("Only images and videos are allowed"));
@@ -145,7 +131,10 @@ router.post("/posts", authMiddleware, upload.array("media", 4), async (req, res)
             return res.status(400).json({ message: "Post cannot be empty" });
         }
 
-        const mediaUrls = files.map(f => `/uploads/${f.filename}`);
+        const mediaUrls = files.map(f => {
+            const b64 = f.buffer.toString("base64");
+            return `data:${f.mimetype};base64,${b64}`;
+        });
         const hasVideo = files.some(f => f.mimetype.startsWith("video/"));
         const hasImage = files.some(f => f.mimetype.startsWith("image/"));
         let postType = "text";
