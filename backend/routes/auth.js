@@ -342,7 +342,9 @@ router.get(
                     u.username,
                     u.email,
                     p.display_name,
-                    p.profile_picture
+                    p.profile_picture,
+                    p.bio,
+                    p.profile_color
                 FROM users u
                 LEFT JOIN profiles p
                     ON u.user_id = p.user_id

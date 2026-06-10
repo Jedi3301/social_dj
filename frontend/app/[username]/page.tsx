@@ -3,14 +3,14 @@
 import { useRouter, useParams } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Heart, MessageCircle, Share2, Trash2, Home, Bell, User, LogOut, Sun, Moon, Search, MapPin, Link as LinkIcon, MoreHorizontal, Send
+  Heart, MessageCircle, Share2, Trash2, Home, Bell, User, LogOut, Sun, Moon, Search, MapPin, Link as LinkIcon, MoreHorizontal, Send, Settings, Users, UserPlus, UserCheck
 } from "lucide-react";
 import { Toggle, GooeyFilter } from "@/components/ui/toggle";
 import styles from "../feed/feed.module.css";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-interface UserInfo { user_id: string; username: string; display_name: string | null; profile_picture: string | null; bio?: string; location?: string; website?: string; }
+interface UserInfo { user_id: string; username: string; display_name: string | null; profile_picture: string | null; bio?: string; location?: string; website?: string; profile_color?: string | null; followers_count?: number; following_count?: number; is_following?: boolean; }
 interface Post extends UserInfo { post_id: string; content: string | null; post_type: string; media_urls: string[]; created_at: string; like_count: number; comment_count: number; liked_by_me: boolean; }
 interface Comment { comment_id: string; user_id: string; username: string; display_name: string | null; profile_picture?: string | null; content: string; created_at: string; like_count: number; liked_by_me: boolean; parent_comment_id: string | null; replies: Comment[]; }
 
@@ -262,6 +262,41 @@ function PostCard({ post: init, currentUser, onDelete }: { post: Post; currentUs
   );
 }
 
+/* ── Profile Suggestion Item ─────────────────────────────── */
+function ProfileSuggestionItem({ user, onNavigate }: { user: UserInfo; onNavigate: () => void }) {
+  const [following, setFollowing] = useState(!!user.is_following);
+  const [loading, setLoading] = useState(false);
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const r = await authFetch(`${API}/api/users/follow/${user.user_id}`, { method: "POST" });
+      const d = await r.json();
+      setFollowing(d.following);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  return (
+    <div className={styles.followItem} onClick={onNavigate} style={{ cursor: "pointer" }}>
+      <Avatar user={user} size={32} />
+      <div className={styles.followInfo}>
+        <span className={styles.followName}>{user.display_name || user.username}</span>
+        <span className={styles.followHandle}>@{user.username}</span>
+      </div>
+      <button
+        className={`btn btn-secondary ${styles.followBtn}`}
+        onClick={handleFollow}
+        disabled={loading}
+        style={following ? { opacity: 0.6 } : {}}
+      >
+        {following ? "Following" : "Follow"}
+      </button>
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const params = useParams();
@@ -275,6 +310,8 @@ export default function ProfilePage() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [dark, setDark] = useState(false);
+  const [following, setFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   const loaderRef = useRef<HTMLDivElement>(null);
   
   const [trends, setTrends] = useState<{ id: number; category: string; name: string; count: string }[]>([]);
@@ -307,6 +344,7 @@ export default function ProfilePage() {
       if (r.ok) {
         const d = await r.json();
         setProfile(d.profile);
+        setFollowing(!!d.profile.is_following);
       } else {
         setProfile(null);
       }
@@ -314,6 +352,18 @@ export default function ProfilePage() {
       console.error(err);
     }
   }, [targetUsername]);
+
+  const handleFollowToggle = async () => {
+    if (!profile || followLoading) return;
+    setFollowLoading(true);
+    try {
+      const r = await authFetch(`${API}/api/users/follow/${profile.user_id}`, { method: "POST" });
+      const d = await r.json();
+      setFollowing(d.following);
+      setProfile(prev => prev ? { ...prev, followers_count: d.followers_count } : prev);
+    } catch { /* ignore */ }
+    setFollowLoading(false);
+  };
 
   const loadPosts = useCallback(async (p: number) => {
     if (p === 1) setLoading(true); else setLoadingMore(true);
@@ -377,11 +427,20 @@ export default function ProfilePage() {
           <div className={styles.sideItem}>
             <Bell size={20} /><span>Notifications</span>
           </div>
+          <div className={styles.sideItem} onClick={() => router.push("/people")}>
+            <Users size={20} /><span>People</span>
+          </div>
           {user && (
             <div className={`${styles.sideItem} ${user.username === targetUsername ? styles.sideActive : ""}`} onClick={() => router.push(`/${user.username}`)}>
               <User size={20} /><span>Profile</span>
             </div>
           )}
+          <div className={styles.sideItem} onClick={() => router.push("/messages")}>
+            <MessageCircle size={20} /><span>Messages</span>
+          </div>
+          <div className={styles.sideItem} onClick={() => router.push("/settings")}>
+            <Settings size={20} /><span>Settings</span>
+          </div>
         </nav>
 
         <div className={styles.sideFooter}>
@@ -413,24 +472,62 @@ export default function ProfilePage() {
         </div>
 
         {profile && (
-            <div style={{ padding: "32px 24px", borderBottom: "1px solid var(--color-hairline)" }}>
+            <div style={{ borderBottom: "1px solid var(--color-hairline)" }}>
                 <div style={{
-                    background: "var(--color-block-lilac)",
-                    borderRadius: "24px",
-                    padding: "48px 32px",
+                    background: profile.profile_color || "var(--color-block-lilac)",
+                    padding: "40px 28px 24px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "16px",
+                    gap: "0",
                     color: "var(--color-ink)"
                 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
-                        <Avatar user={profile} size={86} />
-                        <div>
-                            <h1 className="type-display-lg" style={{ margin: 0 }}>{profile.display_name || profile.username}</h1>
-                            <p className="type-body-lg" style={{ margin: 0, opacity: 0.7 }}>@{profile.username}</p>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "20px", justifyContent: "space-between" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                          <Avatar user={profile} size={80} />
+                          <div>
+                              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: -0.5 }}>{profile.display_name || profile.username}</h1>
+                              <p style={{ margin: "2px 0 0", opacity: 0.6, fontSize: 14 }}>@{profile.username}</p>
+                          </div>
                         </div>
+                        {user && String(user.user_id) !== String(profile.user_id) && (
+                          <button
+                            onClick={handleFollowToggle}
+                            disabled={followLoading}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "9px 20px",
+                              borderRadius: 100,
+                              border: following ? "1.5px solid rgba(0,0,0,0.2)" : "1.5px solid var(--color-ink)",
+                              background: following ? "rgba(0,0,0,0.08)" : "var(--color-ink)",
+                              color: following ? "var(--color-ink)" : "var(--color-canvas)",
+                              fontWeight: 600, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+                              flexShrink: 0, transition: "all 0.2s"
+                            }}
+                          >
+                            {following ? <UserCheck size={14} /> : <UserPlus size={14} />}
+                            {following ? "Following" : "Follow"}
+                          </button>
+                        )}
+                        {user && String(user.user_id) === String(profile.user_id) && (
+                          <button
+                            onClick={() => router.push("/settings")}
+                            style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "9px 20px", borderRadius: 100,
+                              border: "1.5px solid rgba(0,0,0,0.2)", background: "rgba(0,0,0,0.08)",
+                              color: "var(--color-ink)", fontWeight: 600, fontSize: 14,
+                              cursor: "pointer", fontFamily: "inherit"
+                            }}
+                          >
+                            <Settings size={14} />Edit Profile
+                          </button>
+                        )}
                     </div>
-                    {profile.bio && <p className="type-subhead" style={{ marginTop: "16px", marginBottom: "8px" }}>{profile.bio}</p>}
+                    {profile.bio && <p style={{ marginTop: 16, fontSize: 14, opacity: 0.75, lineHeight: 1.5, maxWidth: 400 }}>{profile.bio}</p>}
+                    <div style={{ display: "flex", gap: 24, marginTop: 16, fontSize: 14 }}>
+                        <span><strong>{profile.followers_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>followers</span></span>
+                        <span><strong>{profile.following_count ?? 0}</strong> <span style={{ opacity: 0.6 }}>following</span></span>
+                    </div>
                 </div>
             </div>
         )}
@@ -489,14 +586,7 @@ export default function ProfilePage() {
           {suggestions.length === 0 ? (
              <div className={styles.followItem}><span className={styles.followName} style={{ color: "var(--color-ink)", opacity: 0.5, fontWeight: 400 }}>No suggestions</span></div>
           ) : suggestions.map(u => (
-            <div key={u.user_id} className={styles.followItem} onClick={() => router.push(`/${u.username}`)} style={{ cursor: 'pointer' }}>
-              <Avatar user={u} size={32} />
-              <div className={styles.followInfo}>
-                <span className={styles.followName}>{u.display_name || u.username}</span>
-                <span className={styles.followHandle}>@{u.username}</span>
-              </div>
-              <button className={`btn btn-secondary ${styles.followBtn}`} onClick={(e) => { e.stopPropagation(); /* TODO: Follow action */ }}>Follow</button>
-            </div>
+            <ProfileSuggestionItem key={u.user_id} user={u} onNavigate={() => router.push(`/${u.username}`)} />
           ))}
         </div>
       </aside>

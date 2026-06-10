@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Heart, MessageCircle, Share2, Trash2, Image, Video,
-  Home, Bell, User, LogOut, Sun, Moon, MoreHorizontal, Send, Search,
+  Home, Bell, User, LogOut, Sun, Moon, MoreHorizontal, Send, Search, Settings, Users,
 } from "lucide-react";
 import { Toggle, GooeyFilter } from "@/components/ui/toggle";
 import styles from "./feed.module.css";
@@ -338,6 +338,41 @@ function CreateBox({ currentUser, onCreated }: { currentUser: UserInfo; onCreate
   );
 }
 
+/* ── Suggestion Item (Who to follow) ─────────────────────── */
+function SuggestionItem({ user, onNavigate }: { user: UserInfo; onNavigate: () => void }) {
+  const [following, setFollowing] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      const r = await authFetch(`${API}/api/users/follow/${user.user_id}`, { method: "POST" });
+      const d = await r.json();
+      setFollowing(d.following);
+    } catch { /* ignore */ }
+    setLoading(false);
+  };
+
+  return (
+    <div className={styles.followItem} onClick={onNavigate} style={{ cursor: "pointer" }}>
+      <Avatar user={user} size={32} />
+      <div className={styles.followInfo}>
+        <span className={styles.followName}>{user.display_name || user.username}</span>
+        <span className={styles.followHandle}>@{user.username}</span>
+      </div>
+      <button
+        className={`btn btn-secondary ${styles.followBtn}`}
+        onClick={handleFollow}
+        disabled={loading}
+        style={following ? { opacity: 0.6 } : {}}
+      >
+        {following ? "Following" : "Follow"}
+      </button>
+    </div>
+  );
+}
+
 /* ── Main Feed Page ───────────────────────────────────────── */
 export default function FeedPage() {
   const router = useRouter();
@@ -437,11 +472,20 @@ export default function FeedPage() {
             <div className={styles.sideItem}>
               <Bell size={20} /><span>Notifications</span>
             </div>
+            <div className={styles.sideItem} onClick={() => router.push("/people")}>
+              <Users size={20} /><span>People</span>
+            </div>
             {user && (
               <div className={styles.sideItem} onClick={() => router.push(`/${user.username}`)}>
                 <User size={20} /><span>Profile</span>
               </div>
             )}
+            <div className={styles.sideItem} onClick={() => router.push("/messages")}>
+              <MessageCircle size={20} /><span>Messages</span>
+            </div>
+            <div className={styles.sideItem} onClick={() => router.push("/settings")}>
+              <Settings size={20} /><span>Settings</span>
+            </div>
           </nav>
 
           <div className={styles.sideFooter}>
@@ -525,14 +569,7 @@ export default function FeedPage() {
           {suggestions.length === 0 ? (
              <div className={styles.followItem}><span className={styles.followName} style={{ color: "var(--color-ink)", opacity: 0.5, fontWeight: 400 }}>No suggestions</span></div>
           ) : suggestions.map(u => (
-            <div key={u.user_id} className={styles.followItem} onClick={() => router.push(`/${u.username}`)} style={{ cursor: 'pointer' }}>
-              <Avatar user={u} size={32} />
-              <div className={styles.followInfo}>
-                <span className={styles.followName}>{u.display_name || u.username}</span>
-                <span className={styles.followHandle}>@{u.username}</span>
-              </div>
-              <button className={`btn btn-secondary ${styles.followBtn}`} onClick={(e) => { e.stopPropagation(); /* TODO: Follow action */ }}>Follow</button>
-            </div>
+            <SuggestionItem key={u.user_id} user={u} onNavigate={() => router.push(`/${u.username}`)} />
           ))}
         </div>
       </aside>
