@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social — System Architecture</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:           #060810;
+      --bg-card:      #0d1117;
+      --bg-card2:     #111827;
+      --border:       rgba(255,255,255,0.07);
+      --border-glow:  rgba(255,255,255,0.13);
+      --text:         #f0f4ff;
+      --muted:        #8b96b0;
+      --dim:          #4a5568;
+
+      /* Layer accent colours */
+      --c-client:     #818cf8;  /* indigo */
+      --c-frontend:   #34d399;  /* emerald */
+      --c-backend:    #fb923c;  /* orange */
+      --c-cache:      #f43f5e;  /* rose */
+      --c-queue:      #a78bfa;  /* violet */
+      --c-db:         #38bdf8;  /* sky */
+      --c-vercel:     #fff;     /* white */
+
+      --radius-card:  16px;
+      --radius-chip:  8px;
+      --gutter:       28px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── STARFIELD ───────────────────────────────────────────────── */
+    #stars {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 20% 10%, rgba(129,140,248,.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 80% 80%, rgba(52,211,153,.04) 0%, transparent 60%),
+        var(--bg);
+    }
+    #stars::before, #stars::after {
+      content: '';
+      position: absolute; inset: 0;
+      background-image:
+        radial-gradient(1px 1px at 10% 15%, rgba(255,255,255,.5) 0%, transparent 100%),
+        radial-gradient(1px 1px at 25% 40%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 60% 20%, rgba(255,255,255,.4) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 80% 50%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 45% 70%, rgba(255,255,255,.35) 0%, transparent 100%),
+        radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,.45) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 70% 85%, rgba(255,255,255,.25) 0%, transparent 100%),
+        radial-gradient(1px 1px at 35% 90%, rgba(255,255,255,.3) 0%, transparent 100%),
+        radial-gradient(1px 1px at 5% 60%, rgba(255,255,255,.4) 0%, transparent 100%),
+        radial-gradient(1.5px 1.5px at 50% 50%, rgba(255,255,255,.2) 0%, transparent 100%);
+    }
+
+    /* ─── LAYOUT ──────────────────────────────────────────────────── */
+    .page {
+      position: relative; z-index: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 60px var(--gutter) 100px;
+    }
+
+    /* ─── HEADER ──────────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 72px;
+      animation: fadeUp .8s ease both;
+    }
+    .header-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      letter-spacing: .18em; text-transform: uppercase;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 24px;
+    }
+    .header-eyebrow::before {
+      content: ''; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--c-frontend);
+      box-shadow: 0 0 8px var(--c-frontend);
+      animation: pulse 2s infinite;
+    }
+    h1 {
+      font-size: clamp(2.4rem, 5vw, 4rem);
+      font-weight: 800;
+      letter-spacing: -.03em;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #fff 30%, rgba(255,255,255,.45));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+    .header-sub {
+      font-size: 1rem; color: var(--muted); font-weight: 400; max-width: 560px; margin: 0 auto;
+      line-height: 1.65;
+    }
+
+    /* ─── STACK BADGES ────────────────────────────────────────────── */
+    .stack-badges {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+      margin-top: 28px;
+      animation: fadeUp .9s .1s ease both;
+    }
+    .badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px; font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid;
+      letter-spacing: .04em;
+    }
+
+    /* ─── DIAGRAM CANVAS ──────────────────────────────────────────── */
+    .diagram {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+      position: relative;
+    }
+
+    /* ─── LAYER ───────────────────────────────────────────────────── */
+    .layer {
+      position: relative;
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      padding: 24px;
+      transition: border-color .3s, box-shadow .3s;
+      animation: fadeUp .6s ease both;
+    }
+    .layer:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 0 40px rgba(255,255,255,.03);
+    }
+    .layer-label {
+      position: absolute;
+      top: -12px; left: 20px;
+      display: flex; align-items: center; gap: 7px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .14em; text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid;
+    }
+    .layer-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+
+    /* ─── NODE GRID ───────────────────────────────────────────────── */
+    .node-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .node-grid.cols-3 { --node-cols: 3; }
+    .node-grid.cols-4 { --node-cols: 4; }
+    .node-grid.cols-2 { --node-cols: 2; }
+
+    /* ─── NODE ────────────────────────────────────────────────────── */
+    .node {
+      flex: 1; min-width: 200px;
+      border-radius: var(--radius-chip);
+      border: 1px solid var(--border);
+      background: var(--bg-card2);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+      cursor: default;
+      transition: transform .25s, box-shadow .25s, border-color .25s;
+    }
+    .node::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      border-radius: 2px 2px 0 0;
+      opacity: .9;
+    }
+    .node:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.5);
+    }
+    .node-icon {
+      font-size: 1.5rem; margin-bottom: 10px; display: block;
+    }
+    .node-name {
+      font-size: .875rem; font-weight: 700;
+      color: var(--text); margin-bottom: 4px;
+    }
+    .node-desc {
+      font-size: .75rem; color: var(--muted);
+      line-height: 1.5;
+    }
+    .node-tags {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px;
+    }
+    .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px; font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    /* ─── FLOW CONNECTOR ──────────────────────────────────────────── */
+    .connector {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 6px 0;
+      animation: fadeUp .5s ease both;
+    }
+    .connector-line {
+      flex: 1; max-width: 120px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border), transparent);
+    }
+    .connector-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9.5px;
+      font-weight: 500;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--dim);
+      display: flex; align-items: center; gap: 5px;
+      white-space: nowrap;
+    }
+    .connector-arrow {
+      font-size: 14px; color: var(--dim);
+    }
+
+    /* ─── FLOW SECTION (two cols) ─────────────────────────────────── */
+    .flow-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    /* ─── DATA FLOW CALLOUT ───────────────────────────────────────── */
+    .flow-callout {
+      margin-top: 48px;
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      padding: 28px 32px;
+      animation: fadeUp .7s .3s ease both;
+    }
+    .flow-callout-title {
+      font-size: .8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      margin-bottom: 20px;
+    }
+    .flow-steps {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      align-items: stretch;
+    }
+    .flow-step {
+      flex: 1; min-width: 140px;
+      padding: 0 16px;
+      border-right: 1px solid var(--border);
+      position: relative;
+    }
+    .flow-step:first-child { padding-left: 0; }
+    .flow-step:last-child { border-right: none; }
+    .flow-step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; color: var(--dim);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    .flow-step-title {
+      font-size: .8rem; font-weight: 700;
+      color: var(--text); margin-bottom: 4px;
+    }
+    .flow-step-body {
+      font-size: .7rem; color: var(--muted); line-height: 1.5;
+    }
+    .flow-step-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-bottom: 8px;
+    }
+
+    /* ─── DB SCHEMA BOX ───────────────────────────────────────────── */
+    .schema-grid {
+      display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px;
+    }
+    .schema-table {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+      color: var(--muted);
+    }
+    .schema-table strong {
+      display: block;
+      color: var(--c-db);
+      margin-bottom: 4px;
+      font-size: 11px;
+    }
+
+    /* ─── LEGEND ──────────────────────────────────────────────────── */
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 20px;
+      justify-content: center;
+      margin-top: 48px;
+      padding: 20px 28px;
+      border-radius: var(--radius-card);
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.02);
+      animation: fadeUp .7s .4s ease both;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .78rem; color: var(--muted);
+    }
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ─── COLOUR ASSIGNMENTS ──────────────────────────────────────── */
+    /* CLIENT */
+    .layer.client { border-color: rgba(129,140,248,.2); }
+    .layer.client:hover { box-shadow: 0 0 40px rgba(129,140,248,.06); }
+    .layer.client .layer-label { color: var(--c-client); border-color: rgba(129,140,248,.25); background: rgba(129,140,248,.07); }
+    .layer.client .layer-dot { background: var(--c-client); box-shadow: 0 0 6px var(--c-client); }
+    .node.client::before { background: var(--c-client); }
+    .node.client:hover { border-color: rgba(129,140,248,.35); box-shadow: 0 12px 40px rgba(129,140,248,.1); }
+
+    /* FRONTEND */
+    .layer.frontend { border-color: rgba(52,211,153,.2); }
+    .layer.frontend:hover { box-shadow: 0 0 40px rgba(52,211,153,.06); }
+    .layer.frontend .layer-label { color: var(--c-frontend); border-color: rgba(52,211,153,.25); background: rgba(52,211,153,.07); }
+    .layer.frontend .layer-dot { background: var(--c-frontend); box-shadow: 0 0 6px var(--c-frontend); }
+    .node.frontend::before { background: var(--c-frontend); }
+    .node.frontend:hover { border-color: rgba(52,211,153,.35); box-shadow: 0 12px 40px rgba(52,211,153,.1); }
+
+    /* BACKEND */
+    .layer.backend { border-color: rgba(251,146,60,.2); }
+    .layer.backend:hover { box-shadow: 0 0 40px rgba(251,146,60,.06); }
+    .layer.backend .layer-label { color: var(--c-backend); border-color: rgba(251,146,60,.25); background: rgba(251,146,60,.07); }
+    .layer.backend .layer-dot { background: var(--c-backend); box-shadow: 0 0 6px var(--c-backend); }
+    .node.backend::before { background: var(--c-backend); }
+    .node.backend:hover { border-color: rgba(251,146,60,.35); box-shadow: 0 12px 40px rgba(251,146,60,.1); }
+
+    /* CACHE */
+    .layer.cache { border-color: rgba(244,63,94,.2); }
+    .layer.cache:hover { box-shadow: 0 0 40px rgba(244,63,94,.06); }
+    .layer.cache .layer-label { color: var(--c-cache); border-color: rgba(244,63,94,.25); background: rgba(244,63,94,.07); }
+    .layer.cache .layer-dot { background: var(--c-cache); box-shadow: 0 0 6px var(--c-cache); }
+    .node.cache::before { background: var(--c-cache); }
+    .node.cache:hover { border-color: rgba(244,63,94,.35); box-shadow: 0 12px 40px rgba(244,63,94,.1); }
+
+    /* QUEUE */
+    .layer.queue { border-color: rgba(167,139,250,.2); }
+    .layer.queue:hover { box-shadow: 0 0 40px rgba(167,139,250,.06); }
+    .layer.queue .layer-label { color: var(--c-queue); border-color: rgba(167,139,250,.25); background: rgba(167,139,250,.07); }
+    .layer.queue .layer-dot { background: var(--c-queue); box-shadow: 0 0 6px var(--c-queue); }
+    .node.queue::before { background: var(--c-queue); }
+    .node.queue:hover { border-color: rgba(167,139,250,.35); box-shadow: 0 12px 40px rgba(167,139,250,.1); }
+
+    /* DB */
+    .layer.db { border-color: rgba(56,189,248,.2); }
+    .layer.db:hover { box-shadow: 0 0 40px rgba(56,189,248,.06); }
+    .layer.db .layer-label { color: var(--c-db); border-color: rgba(56,189,248,.25); background: rgba(56,189,248,.07); }
+    .layer.db .layer-dot { background: var(--c-db); box-shadow: 0 0 6px var(--c-db); }
+    .node.db::before { background: var(--c-db); }
+    .node.db:hover { border-color: rgba(56,189,248,.35); box-shadow: 0 12px 40px rgba(56,189,248,.1); }
+
+    /* VERCEL */
+    .layer.vercel { border-color: rgba(255,255,255,.1); }
+    .layer.vercel .layer-label { color: #fff; border-color: rgba(255,255,255,.15); background: rgba(255,255,255,.05); }
+    .layer.vercel .layer-dot { background: #fff; box-shadow: 0 0 6px #fff; }
+    .node.vercel::before { background: linear-gradient(90deg, #fff, rgba(255,255,255,.5)); }
+    .node.vercel:hover { border-color: rgba(255,255,255,.2); box-shadow: 0 12px 40px rgba(255,255,255,.05); }
+
+    /* ─── ANIMATIONS ──────────────────────────────────────────────── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(18px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: .35; }
+    }
+    @keyframes flow {
+      0%   { background-position: 200% center; }
+      100% { background-position: -200% center; }
+    }
+
+    .layer:nth-child(1)  { animation-delay: .05s; }
+    .layer:nth-child(2)  { animation-delay: .12s; }
+    .layer:nth-child(3)  { animation-delay: .19s; }
+    .layer:nth-child(4)  { animation-delay: .26s; }
+    .layer:nth-child(5)  { animation-delay: .33s; }
+    .layer:nth-child(6)  { animation-delay: .40s; }
+
+    /* ─── ANIMATED DATA FLOW LINE ─────────────────────────────────── */
+    .data-flow-line {
+      height: 1px;
+      width: 100%;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--border) 20%,
+        rgba(255,255,255,.35) 50%,
+        var(--border) 80%,
+        transparent 100%
+      );
+      background-size: 200% 100%;
+      animation: flow 3s linear infinite;
+    }
+
+    /* ─── SIDE-BY-SIDE FLOW LAYERS ────────────────────────────────── */
+    .layer-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    @media (max-width: 760px) {
+      .layer-row { grid-template-columns: 1fr; }
+      .flow-section { grid-template-columns: 1fr; }
+      .flow-steps { flex-direction: column; }
+      .flow-step { border-right: none; border-bottom: 1px solid var(--border); padding: 12px 0; }
+      .flow-step:last-child { border-bottom: none; }
+    }
+
+    /* ─── VERCEL WRAPPER ──────────────────────────────────────────── */
+    .vercel-wrapper {
+      border: 1px dashed rgba(255,255,255,.12);
+      border-radius: 20px;
+      padding: 20px;
+      position: relative;
+      margin-top: 4px;
+    }
+    .vercel-badge {
+      position: absolute; top: -13px; right: 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,255,255,.5);
+      background: var(--bg);
+      padding: 2px 10px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 999px;
+    }
+
+    /* ─── MINI ROUTE TABLE ────────────────────────────────────────── */
+    .route-table {
+      display: flex; flex-direction: column; gap: 5px; margin-top: 12px;
+    }
+    .route-row {
+      display: flex; gap: 8px; align-items: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px; color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.02);
+      border: 1px solid var(--border);
+    }
+    .method {
+      font-weight: 700; min-width: 38px; text-align: center;
+      padding: 1px 6px; border-radius: 4px; font-size: 9.5px;
+    }
+    .method.get  { color: #34d399; background: rgba(52,211,153,.1); }
+    .method.post { color: #fb923c; background: rgba(251,146,60,.1); }
+    .method.del  { color: #f43f5e; background: rgba(244,63,94,.1); }
+    .route-path  { color: rgba(255,255,255,.55); flex: 1; }
+    .route-desc  { color: var(--dim); font-size: 9.5px; }
+  </style>
+</head>
+<body>
+
+<div id="stars"></div>
+
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-eyebrow">System Architecture · Full-Stack</div>
+    <h1>Social Network</h1>
+    <p class="header-sub">A production-ready monochrome social platform — Next.js 16, Express, Neon PostgreSQL, Redis Cache-Aside &amp; BullMQ background jobs, deployed on Vercel.</p>
+    <div class="stack-badges">
+      <span class="badge" style="color:var(--c-client);border-color:rgba(129,140,248,.3)">Browser</span>
+      <span class="badge" style="color:var(--c-frontend);border-color:rgba(52,211,153,.3)">Next.js 16</span>
+      <span class="badge" style="color:var(--c-frontend);border-color:rgba(52,211,153,.2)">React 19</span>
+      <span class="badge" style="color:var(--c-frontend);border-color:rgba(52,211,153,.2)">TypeScript</span>
+      <span class="badge" style="color:var(--c-backend);border-color:rgba(251,146,60,.3)">Express 5</span>
+      <span class="badge" style="color:var(--c-backend);border-color:rgba(251,146,60,.2)">JWT Auth</span>
+      <span class="badge" style="color:var(--c-backend);border-color:rgba(251,146,60,.2)">Multer</span>
+      <span class="badge" style="color:var(--c-cache);border-color:rgba(244,63,94,.3)">Redis</span>
+      <span class="badge" style="color:var(--c-queue);border-color:rgba(167,139,250,.3)">BullMQ</span>
+      <span class="badge" style="color:var(--c-db);border-color:rgba(56,189,248,.3)">Neon Postgres</span>
+      <span class="badge" style="color:#fff;border-color:rgba(255,255,255,.2)">Vercel</span>
+    </div>
+  </div>
+
+  <!-- DIAGRAM -->
+  <div class="diagram">
+
+    <!-- ① CLIENT LAYER -->
+    <div class="layer client" style="animation-delay:.05s">
+      <div class="layer-label"><span class="layer-dot"></span>Client Layer</div>
+      <div class="node-grid" style="margin-top:8px">
+        <div class="node client">
+          <span class="node-icon">🌐</span>
+          <div class="node-name">Browser</div>
+          <div class="node-desc">Desktop &amp; Mobile. Responsive layout with sidebar nav on desktop, bottom nav on mobile.</div>
+          <div class="node-tags"><span class="tag">10s Polling</span><span class="tag">CSS Modules</span><span class="tag">Dark/Light Mode</span></div>
+        </div>
+        <div class="node client">
+          <span class="node-icon">📱</span>
+          <div class="node-name">Responsive UI</div>
+          <div class="node-desc">Monochrome design system. HSL token-based CSS variables. Glassmorphism cards. Micro-animations.</div>
+          <div class="node-tags"><span class="tag">Lucide Icons</span><span class="tag">Inter Font</span><span class="tag">CSS Variables</span></div>
+        </div>
+        <div class="node client">
+          <span class="node-icon">🔒</span>
+          <div class="node-name">JWT Session</div>
+          <div class="node-desc">JWT stored in localStorage. Attached as Bearer token on every API call. Auto-refresh on 401.</div>
+          <div class="node-tags"><span class="tag">Bearer Token</span><span class="tag">localStorage</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONNECTOR -->
+    <div class="connector">
+      <div class="connector-line"></div>
+      <span class="connector-label"><span class="connector-arrow">↕</span> HTTPS · REST API · JSON</span>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- VERCEL DEPLOYMENT WRAPPER -->
+    <div class="vercel-wrapper">
+      <div class="vercel-badge">▲ Deployed on Vercel</div>
+
+      <div style="display:flex;flex-direction:column;gap:4px">
+
+        <!-- ② FRONTEND LAYER -->
+        <div class="layer frontend" style="animation-delay:.12s">
+          <div class="layer-label"><span class="layer-dot"></span>Frontend · Next.js 16 App Router</div>
+          <div class="node-grid" style="margin-top:8px">
+            <div class="node frontend">
+              <span class="node-icon">📰</span>
+              <div class="node-name">Feed Page <code style="font-size:10px;color:var(--muted)">/feed</code></div>
+              <div class="node-desc">Infinite-scroll post feed. 10s polling. Optimistic like/comment updates. Real-time badge counts.</div>
+              <div class="node-tags"><span class="tag">Server Component</span><span class="tag">useEffect poll</span></div>
+            </div>
+            <div class="node frontend">
+              <span class="node-icon">👤</span>
+              <div class="node-name">Profile Pages <code style="font-size:10px;color:var(--muted)">/[username]</code></div>
+              <div class="node-desc">Case-insensitive dynamic routing. Custom display names, avatars, bios, personal timelines, follow overlays.</div>
+              <div class="node-tags"><span class="tag">Dynamic Route</span><span class="tag">SSR</span></div>
+            </div>
+            <div class="node frontend">
+              <span class="node-icon">🔔</span>
+              <div class="node-name">Notifications <code style="font-size:10px;color:var(--muted)">/notifications</code></div>
+              <div class="node-desc">Aggregated Instagram-style notifications. Layout-level unread badge. 10s polling refresh.</div>
+              <div class="node-tags"><span class="tag">Badge Count</span><span class="tag">Polling</span></div>
+            </div>
+            <div class="node frontend">
+              <span class="node-icon">⚙️</span>
+              <div class="node-name">Settings &amp; People</div>
+              <div class="node-desc">Avatar upload (base64), display name, bio, custom profile color picker. People discovery page.</div>
+              <div class="node-tags"><span class="tag">base64 Avatar</span><span class="tag">Color Picker</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CONNECTOR -->
+        <div class="connector">
+          <div class="connector-line"></div>
+          <span class="connector-label"><span class="connector-arrow">↕</span> Internal API Routes / Express</span>
+          <div class="connector-line"></div>
+        </div>
+
+        <!-- ③ BACKEND LAYER -->
+        <div class="layer backend" style="animation-delay:.19s">
+          <div class="layer-label"><span class="layer-dot"></span>Backend · Express 5 · Node.js · Serverless Functions</div>
+          <div class="node-grid" style="margin-top:8px">
+
+            <div class="node backend">
+              <span class="node-icon">🛡️</span>
+              <div class="node-name">Auth Routes <code style="font-size:10px;color:var(--muted)">/api/auth</code></div>
+              <div class="node-desc">Register, login, forgot/reset password. bcrypt hashing. JWT signing. Forced light-mode on auth pages.</div>
+              <div class="node-tags"><span class="tag">bcrypt</span><span class="tag">JWT</span><span class="tag">Auth Middleware</span></div>
+            </div>
+
+            <div class="node backend">
+              <span class="node-icon">📡</span>
+              <div class="node-name">Feed Routes <code style="font-size:10px;color:var(--muted)">/api/feed</code></div>
+              <div class="node-desc">Posts CRUD, likes, threaded comments (recursive tree merge). Cache-Aside on GET. BullMQ on POST. Multer in-memory file upload (base64 → DB).</div>
+              <div class="node-tags"><span class="tag">Cache-Aside</span><span class="tag">BullMQ</span><span class="tag">Multer memStorage</span></div>
+            </div>
+
+            <div class="node backend">
+              <span class="node-icon">👥</span>
+              <div class="node-name">Users Routes <code style="font-size:10px;color:var(--muted)">/api/users</code></div>
+              <div class="node-desc">Profile upserts, followers/following lists, avatar upload, performance-indexed queries. Supports base64 large payloads.</div>
+              <div class="node-tags"><span class="tag">Upsert</span><span class="tag">PG Index</span></div>
+            </div>
+
+            <div class="node backend">
+              <span class="node-icon">📈</span>
+              <div class="node-name">Trends &amp; Notifs <code style="font-size:10px;color:var(--muted)">/api/trends · /api/notifications</code></div>
+              <div class="node-desc">Live hashtag metrics from <code style="font-size:10px">hashtag_metrics</code> table. Instagram-style aggregated like/comment/follow notifications.</div>
+              <div class="node-tags"><span class="tag">Hashtag Extraction</span><span class="tag">Aggregated</span></div>
+            </div>
+
+          </div>
+
+          <!-- MINI ROUTE TABLE -->
+          <div style="margin-top:16px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px">Key API Routes</div>
+            <div class="route-table">
+              <div class="route-row"><span class="method get">GET</span><span class="route-path">/api/feed</span><span class="route-desc">Redis cache-aside → Postgres paginated posts</span></div>
+              <div class="route-row"><span class="method post">POST</span><span class="route-path">/api/feed/posts</span><span class="route-desc">Create post → queue BullMQ job → return instantly</span></div>
+              <div class="route-row"><span class="method post">POST</span><span class="route-path">/api/feed/posts/:id/like</span><span class="route-desc">Toggle like + aggregated notification update</span></div>
+              <div class="route-row"><span class="method get">GET</span><span class="route-path">/api/feed/posts/:id/comments</span><span class="route-desc">Flat SQL → recursive tree merge in JS</span></div>
+              <div class="route-row"><span class="method del">DEL</span><span class="route-path">/api/feed/posts/:id</span><span class="route-desc">Delete + decrement hashtag counts + invalidate cache</span></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /vercel-wrapper -->
+
+    <!-- CONNECTOR -->
+    <div class="connector">
+      <div class="connector-line"></div>
+      <span class="connector-label"><span class="connector-arrow">↕</span> ioredis / pg driver · TLS</span>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- ④ CACHE + QUEUE LAYER (side by side) -->
+    <div class="layer-row">
+
+      <div class="layer cache" style="animation-delay:.26s">
+        <div class="layer-label"><span class="layer-dot"></span>Cache · Redis (Upstash)</div>
+        <div class="node-grid" style="margin-top:8px">
+          <div class="node cache" style="min-width:0;flex:1">
+            <span class="node-icon">⚡</span>
+            <div class="node-name">Cache-Aside Feed</div>
+            <div class="node-desc">Feed pages cached at key <code style="font-size:10px">global:feed:page:N</code>. 5-min TTL. Invalidated on post/like/delete via <code style="font-size:10px">invalidateFeedCache()</code>.</div>
+            <div class="node-tags"><span class="tag">5 min TTL</span><span class="tag">Pattern Delete</span></div>
+          </div>
+          <div class="node cache" style="min-width:0;flex:1">
+            <span class="node-icon">🔌</span>
+            <div class="node-name">Graceful Fallback</div>
+            <div class="node-desc">Redis is optional. If not configured, <code style="font-size:10px">isRedisEnabled()</code> returns false and all reads go directly to Postgres. Zero config needed for local dev.</div>
+            <div class="node-tags"><span class="tag">PG Fallback</span><span class="tag">ioredis</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="layer queue" style="animation-delay:.26s">
+        <div class="layer-label"><span class="layer-dot"></span>Background Jobs · BullMQ + Redis</div>
+        <div class="node-grid" style="margin-top:8px">
+          <div class="node queue" style="min-width:0;flex:1">
+            <span class="node-icon">⚙️</span>
+            <div class="node-name">feed-jobs Queue</div>
+            <div class="node-desc">Post creation offloads hashtag extraction &amp; <code style="font-size:10px">hashtag_metrics</code> upserts to background. 3 retries, exponential backoff.</div>
+            <div class="node-tags"><span class="tag">3 Retries</span><span class="tag">Exp. Backoff</span><span class="tag">concurrency: 2</span></div>
+          </div>
+          <div class="node queue" style="min-width:0;flex:1">
+            <span class="node-icon">🚫</span>
+            <div class="node-name">Serverless Guard</div>
+            <div class="node-desc">Workers only start in non-Vercel environments (<code style="font-size:10px">!process.env.VERCEL</code>). On Vercel, falls back to inline execution — stateless functions stay clean.</div>
+            <div class="node-tags"><span class="tag">Inline Fallback</span><span class="tag">Env Guard</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONNECTOR -->
+    <div class="connector">
+      <div class="connector-line"></div>
+      <span class="connector-label"><span class="connector-arrow">↕</span> Neon Serverless Driver · SSL/TLS · Connection Pool</span>
+      <div class="connector-line"></div>
+    </div>
+
+    <!-- ⑤ DATABASE LAYER -->
+    <div class="layer db" style="animation-delay:.33s">
+      <div class="layer-label"><span class="layer-dot"></span>Persistence · Neon Postgres (Serverless)</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:8px">
+
+        <div class="node db" style="flex:1;min-width:240px">
+          <span class="node-icon">🗄️</span>
+          <div class="node-name">Auto-Migration on Startup</div>
+          <div class="node-desc">All tables are created and <code style="font-size:10px">ALTER</code>-patched on every server boot — no manual SQL scripts. Schema drift is impossible.</div>
+          <div class="node-tags"><span class="tag">CREATE IF NOT EXISTS</span><span class="tag">ALTER TABLE ADD COLUMN</span></div>
+          <div class="schema-grid">
+            <div class="schema-table"><strong>users</strong>user_id · username · password_hash · email</div>
+            <div class="schema-table"><strong>profiles</strong>user_id · display_name · bio · profile_picture · profile_color</div>
+            <div class="schema-table"><strong>posts</strong>post_id · user_id · content · post_type · media_urls · created_at</div>
+            <div class="schema-table"><strong>comments</strong>comment_id · post_id · user_id · content · parent_comment_id</div>
+            <div class="schema-table"><strong>post_likes</strong>like_id · post_id · user_id</div>
+            <div class="schema-table"><strong>comment_likes</strong>like_id · comment_id · user_id</div>
+            <div class="schema-table"><strong>follows</strong>follower_id · following_id · created_at</div>
+            <div class="schema-table"><strong>notifications</strong>notification_id · recipient_id · sender_id · type · post_id · is_read</div>
+            <div class="schema-table"><strong>hashtag_metrics</strong>hashtag · post_count</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;flex:0 0 220px">
+          <div class="node db" style="min-width:0">
+            <span class="node-icon">🚀</span>
+            <div class="node-name">Performance Indexes</div>
+            <div class="node-desc">Indexes on <code style="font-size:10px">posts.created_at</code>, <code style="font-size:10px">post_likes(post_id, user_id)</code>, <code style="font-size:10px">follows(follower_id)</code>, <code style="font-size:10px">notifications(recipient_id)</code>.</div>
+            <div class="node-tags"><span class="tag">B-tree Index</span><span class="tag">Composite</span></div>
+          </div>
+          <div class="node db" style="min-width:0">
+            <span class="node-icon">🔐</span>
+            <div class="node-name">Neon Serverless + SSL</div>
+            <div class="node-desc">Connection string auto-detected. SSL enforced for Neon. Falls back to standard <code style="font-size:10px">pg.Pool</code> for local Postgres.</div>
+            <div class="node-tags"><span class="tag">@neondatabase/serverless</span><span class="tag">pg driver</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /diagram -->
+
+  <!-- DATA FLOW CALLOUT -->
+  <div class="flow-callout">
+    <div class="flow-callout-title">🔄 Feed Request · End-to-End Data Flow</div>
+    <div class="flow-steps">
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-client)"></div>
+        <div class="flow-step-num">01 · Browser</div>
+        <div class="flow-step-title">10s Poll Fires</div>
+        <div class="flow-step-body">Client calls <code style="font-size:9.5px">GET /api/feed?page=1</code> with Bearer JWT every 10 seconds via <code style="font-size:9.5px">useEffect</code> interval.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-frontend)"></div>
+        <div class="flow-step-num">02 · Express</div>
+        <div class="flow-step-title">JWT Verified</div>
+        <div class="flow-step-body"><code style="font-size:9.5px">authMiddleware</code> verifies JWT. <code style="font-size:9.5px">req.user</code> populated with <code style="font-size:9.5px">user_id</code>. Passes to route handler.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-cache)"></div>
+        <div class="flow-step-num">03 · Redis Check</div>
+        <div class="flow-step-title">Cache Lookup</div>
+        <div class="flow-step-body">Key <code style="font-size:9.5px">global:feed:page:1:limit:20</code> checked in Redis. <strong style="color:#f43f5e">HIT</strong> → return instantly. <strong style="color:#34d399">MISS</strong> → go to Postgres.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-db)"></div>
+        <div class="flow-step-num">04 · Postgres</div>
+        <div class="flow-step-title">Paginated JOIN</div>
+        <div class="flow-step-body">JOIN on <code style="font-size:9.5px">posts → users → profiles</code>. Subqueries for <code style="font-size:9.5px">like_count</code> &amp; <code style="font-size:9.5px">comment_count</code>. LIMIT + OFFSET pagination.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-cache)"></div>
+        <div class="flow-step-num">05 · Hydrate Cache</div>
+        <div class="flow-step-title">setEx 300s</div>
+        <div class="flow-step-body">Result stored in Redis with 5-minute TTL. Future requests within TTL bypass DB entirely — zero cold-path cost.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-frontend)"></div>
+        <div class="flow-step-num">06 · Personalize</div>
+        <div class="flow-step-title">liked_by_me Merge</div>
+        <div class="flow-step-body">User-specific <code style="font-size:9.5px">liked_by_me</code> flag computed via a single targeted <code style="font-size:9.5px">post_likes</code> query and merged into the cached posts.</div>
+      </div>
+      <div class="flow-step">
+        <div class="flow-step-dot" style="background:var(--c-client)"></div>
+        <div class="flow-step-num">07 · Response</div>
+        <div class="flow-step-title">JSON to UI</div>
+        <div class="flow-step-body">Posts with full user metadata, counts, and personalization returned. React re-renders only changed cards.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-client);box-shadow:0 0 6px var(--c-client)"></div> Browser / Client</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-frontend);box-shadow:0 0 6px var(--c-frontend)"></div> Next.js Frontend</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-backend);box-shadow:0 0 6px var(--c-backend)"></div> Express Backend</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-cache);box-shadow:0 0 6px var(--c-cache)"></div> Redis Cache</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-queue);box-shadow:0 0 6px var(--c-queue)"></div> BullMQ Queue</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--c-db);box-shadow:0 0 6px var(--c-db)"></div> Neon PostgreSQL</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#fff;box-shadow:0 0 6px rgba(255,255,255,.5)"></div> Vercel Deploy</div>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="text-align:center;margin-top:48px;font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--dim);letter-spacing:.06em">
+    social · architecture · 2026 · Next.js 16 + Express + Neon + Redis + BullMQ
+  </div>
+
+</div>
+
+<script>
+  // Stagger node entrance animations
+  document.querySelectorAll('.node').forEach((el, i) => {
+    el.style.animation = `fadeUp 0.5s ${0.05 + i * 0.04}s ease both`;
+  });
+
+  // Subtle parallax on mouse move for star field
+  document.addEventListener('mousemove', (e) => {
+    const x = (e.clientX / window.innerWidth - 0.5) * 12;
+    const y = (e.clientY / window.innerHeight - 0.5) * 12;
+    document.getElementById('stars').style.transform = `translate(${x}px, ${y}px)`;
+  });
+</script>
+
+</body>
+</html>

@@ -48,12 +48,12 @@ function Avatar({ user, size = 40 }: { user: { display_name: string | null; user
 
 function MediaGrid({ urls, type }: { urls: string[]; type: string }) {
   if (!urls.length) return null;
-  const isVid = (u: string) => /\.(mp4|webm|ogg|mov)$/i.test(u);
+  const isVid = (u: string) => u.startsWith("data:video/") || /\.(mp4|webm|ogg|mov|m4v)$/i.test(u);
   return (
     <div className={`${styles.mediaGrid} ${styles[`mg${Math.min(urls.length, 4)}`]}`}>
       {urls.slice(0, 4).map((u, i) => {
         const src = u.startsWith("data:") || u.startsWith("http") ? u : `${API}${u}`;
-        return isVid(u) || type === "video"
+        return isVid(src) || type === "video"
           ? <video key={i} src={src} controls className={styles.mediaItem} />
           // eslint-disable-next-line @next/next/no-img-element
           : <img key={i} src={src} alt="" className={styles.mediaItem} />
