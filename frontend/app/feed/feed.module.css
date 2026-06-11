@@ -14,10 +14,11 @@
 /* ── Shell ───────────────────────────────────────────────── */
 .shell {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
+  width: 100%;
   min-height: 100vh;
   background: var(--color-canvas);
-  padding-right: 48px; /* Shifts the center to the left to balance the heavy right sidebar */
+  padding-right: 0;
   transition: background 0.3s ease;
 }
 
