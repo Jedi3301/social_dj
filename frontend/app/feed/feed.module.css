@@ -13,7 +13,8 @@
 
 /* ── Shell ───────────────────────────────────────────────── */
 .shell {
-  display: flex;
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr) 320px;
   justify-content: flex-start;
   width: 100%;
   min-height: 100vh;
@@ -138,7 +139,8 @@
 
 .feedMain {
   width: 100%;
-  max-width: 600px;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--color-hairline);
